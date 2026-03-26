@@ -1,3 +1,6 @@
+[tool.poetry.scripts]
+bootstrap-admin = "app.cli.bootstrap_admin:main"
+
 [tool.poetry]
 name = "church-management-backend"
 version = "0.1.0"

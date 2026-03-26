@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     TENANCY_MODE: str = "single_tenant"  # later: "schema_per_tenant" / "db_per_tenant" etc.
     TENANT_ID: str = "default"
 
+    # ---- Dev bootstrap (optional; see README / `poetry run bootstrap-admin`) ----
+    BOOTSTRAP_ADMIN_EMAIL: str | None = None
+    BOOTSTRAP_ADMIN_PASSWORD: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

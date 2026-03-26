@@ -21,13 +21,16 @@ async def engine():
 
 
 @pytest_asyncio.fixture
-async def client(engine):
-    session_factory = async_sessionmaker(
+async def session_factory(engine):
+    return async_sessionmaker(
         bind=engine,
         class_=AsyncSession,
         expire_on_commit=False,
     )
 
+
+@pytest_asyncio.fixture
+async def client(engine, session_factory):
     async def override_get_session():
         async with session_factory() as session:
             yield session

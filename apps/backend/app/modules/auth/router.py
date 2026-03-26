@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.normalization import normalize_email
 from app.core.security import create_access_token
 from app.db.models.enums import UserRole
 from app.db.models.user import User
@@ -28,7 +29,7 @@ async def register(
     body: RegisterRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> RegisterResponse:
-    email_norm = body.email.lower().strip()
+    email_norm = normalize_email(str(body.email))
     existing = await auth_service.get_user_by_email(session, email_norm)
     if existing is not None:
         raise HTTPException(
@@ -55,7 +56,7 @@ async def login(
     body: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> TokenResponse:
-    email_norm = body.email.lower().strip()
+    email_norm = normalize_email(str(body.email))
     user = await auth_service.authenticate_user(
         session,
         email=email_norm,
