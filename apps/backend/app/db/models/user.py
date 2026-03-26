@@ -12,6 +12,8 @@ from app.db.models.enums import UserRole
 
 if TYPE_CHECKING:
     from app.db.models.member_profile import MemberProfile
+    from app.db.models.ministry_group import MinistryGroup
+    from app.db.models.ministry_membership import MinistryMembership
 
 
 class User(Base):
@@ -49,4 +51,13 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    led_ministries: Mapped[list["MinistryGroup"]] = relationship(
+        back_populates="leader",
+        foreign_keys="MinistryGroup.leader_user_id",
+    )
+    ministry_memberships: Mapped[list["MinistryMembership"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="MinistryMembership.user_id",
     )

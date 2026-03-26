@@ -22,3 +22,11 @@ class MaritalStatus(str, enum.Enum):
     DIVORCED = "divorced"
     SEPARATED = "separated"
     PREFER_NOT_TO_SAY = "prefer_not_to_say"
+
+
+class MinistryRoleInMinistry(str, enum.Enum):
+    """Role of a user within a ministry (not the same as system UserRole)."""
+
+    MEMBER = "member"
+    LEADER = "leader"
+    COORDINATOR = "coordinator"

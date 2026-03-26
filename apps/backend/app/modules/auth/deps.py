@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_token, token_subject_uuid
+from app.modules.auth.constants import INACTIVE_USER_DETAIL
 from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.db.session import get_async_session
@@ -47,7 +48,10 @@ async def get_current_active_user(
     user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=INACTIVE_USER_DETAIL,
+        )
     return user
 
 

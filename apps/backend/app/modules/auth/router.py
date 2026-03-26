@@ -11,6 +11,7 @@ from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth import service as auth_service
+from app.modules.auth.constants import INACTIVE_USER_DETAIL
 from app.modules.auth.deps import get_current_active_user, require_roles
 from app.modules.auth.schemas import (
     LoginRequest,
@@ -68,7 +69,10 @@ async def login(
             detail="Incorrect email or password",
         )
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=INACTIVE_USER_DETAIL,
+        )
 
     token = create_access_token(user_id=user.id)
     return TokenResponse(access_token=token, token_type="bearer")
