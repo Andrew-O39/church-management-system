@@ -26,6 +26,11 @@ export type UserOut = {
 
 export type MeResponse = UserOut;
 
+/** Matches backend `RegisterResponse` from POST /api/v1/auth/register (201). */
+export type RegisterResponse = JwtTokenResponse & {
+  user: UserOut;
+};
+
 export type MemberProfileOut = {
   id: string;
   user_id: string;
@@ -100,5 +105,61 @@ export type MemberAdminPatch = {
   whatsapp_enabled?: boolean | null;
   sms_enabled?: boolean | null;
   preferred_channel?: PreferredChannel | null;
+};
+
+export type MinistryRoleInMinistry = "member" | "leader" | "coordinator";
+
+export type MinistryListItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  leader_user_id: string | null;
+  active_member_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MinistryListResponse = {
+  items: MinistryListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type MinistryMemberRow = {
+  membership_id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  role_in_ministry: MinistryRoleInMinistry;
+  is_active: boolean;
+  joined_at: string;
+};
+
+export type MinistryDetailResponse = {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  leader_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  members: MinistryMemberRow[];
+};
+
+export type MyMinistryItem = {
+  ministry_id: string;
+  name: string;
+  description: string | null;
+  ministry_is_active: boolean;
+  membership_id: string;
+  role_in_ministry: MinistryRoleInMinistry;
+  membership_is_active: boolean;
+  joined_at: string;
+};
+
+export type MyMinistriesResponse = {
+  items: MyMinistryItem[];
 };
 

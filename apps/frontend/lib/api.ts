@@ -8,6 +8,20 @@ export type ApiError = {
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+function normalizeErrorDetail(raw: unknown): string | undefined {
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw) && raw.length > 0) {
+    const first = raw[0];
+    if (first && typeof first === "object" && "msg" in first) {
+      return String((first as { msg: unknown }).msg);
+    }
+  }
+  if (raw && typeof raw === "object" && "msg" in raw) {
+    return String((raw as { msg: unknown }).msg);
+  }
+  return undefined;
+}
+
 function buildUrl(path: string) {
   if (!path.startsWith("/")) return `${apiBaseUrl}/${path}`;
   return `${apiBaseUrl}${path}`;
@@ -41,8 +55,8 @@ export async function apiFetch<T>(
   if (!res.ok) {
     let detail: string | undefined;
     try {
-      const json = (await res.json()) as { detail?: string; message?: string };
-      detail = json.detail ?? json.message;
+      const json = (await res.json()) as { detail?: unknown; message?: unknown };
+      detail = normalizeErrorDetail(json.detail) ?? normalizeErrorDetail(json.message);
     } catch {
       detail = await res.text().catch(() => undefined);
     }
@@ -50,6 +64,10 @@ export async function apiFetch<T>(
     throw err;
   }
 
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (!text) {
+    return undefined as T;
+  }
+  return JSON.parse(text) as T;
 }
 

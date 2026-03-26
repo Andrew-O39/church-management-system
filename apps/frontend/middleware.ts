@@ -4,7 +4,13 @@ import type { NextRequest } from "next/server";
 const TOKEN_COOKIE = "access_token";
 
 function isProtectedPath(pathname: string) {
-  return pathname === "/profile" || pathname === "/members" || pathname.startsWith("/members/");
+  return (
+    pathname === "/profile" ||
+    pathname === "/members" ||
+    pathname.startsWith("/members/") ||
+    pathname === "/ministries" ||
+    pathname.startsWith("/ministries/")
+  );
 }
 
 export function middleware(req: NextRequest) {
@@ -26,6 +32,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/profile/:path*", "/members/:path*"],
+  matcher: ["/profile/:path*", "/members/:path*", "/ministries/:path*"],
 };
 

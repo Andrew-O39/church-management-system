@@ -1,28 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ApiError } from "lib/api";
+import type { FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "components/providers/AuthProvider";
 import { apiFetch } from "lib/api";
 import { getAccessToken } from "lib/session";
+import { clearSessionAndRedirect } from "lib/auth";
+import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
 import type {
   MemberAdminPatch,
   MemberDetailResponse,
   MaritalStatus,
   PreferredChannel,
   UserRole,
-  MeResponse,
 } from "lib/types";
-import Link from "next/link";
-import type { FormEvent } from "react";
-
-function toErrorMessage(err: unknown) {
-  if (typeof err === "object" && err && "status" in err) {
-    const e = err as ApiError;
-    if (e.detail) return e.detail;
-    return `Request failed (${e.status})`;
-  }
-  return err instanceof Error ? err.message : "Request failed";
-}
+import PageShell, { ContentCard } from "components/layout/PageShell";
 
 function optString(v: string) {
   const s = v.trim();
@@ -46,16 +40,15 @@ export default function MemberDetailPage({
     id: string;
   };
 }) {
+  const router = useRouter();
   const token = getAccessToken();
   const memberId = params.id;
+  const { user, status, isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const isAdmin = me?.role === "admin";
+  const [success, setSuccess] = useState(false);
 
   const [original, setOriginal] = useState<MemberDetailResponse | null>(null);
 
@@ -79,8 +72,24 @@ export default function MemberDetailPage({
   const [preferredChannel, setPreferredChannel] = useState<PreferredChannel>("whatsapp");
 
   useEffect(() => {
+    if (status === "authenticated" && user && !isAdmin) {
+      router.replace("/profile?notice=admin_only");
+    }
+  }, [status, user, isAdmin, router]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (status !== "authenticated" || !user || !isAdmin) {
+      if (status === "unauthenticated") {
+        setError("You need to sign in to view this page.");
+      }
+      setLoading(false);
+      setOriginal(null);
+      return;
+    }
+
     if (!token) {
-      setError("Not authenticated. Please log in again.");
       setLoading(false);
       return;
     }
@@ -88,15 +97,15 @@ export default function MemberDetailPage({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setSuccess(null);
+    setSuccess(false);
 
-    Promise.all([
-      apiFetch<MeResponse>("/api/v1/auth/me", { method: "GET", token }),
-      apiFetch<MemberDetailResponse>(`/api/v1/members/${memberId}`, { method: "GET", token }),
-    ])
-      .then(([meRes, detail]) => {
+    (async () => {
+      try {
+        const detail = await apiFetch<MemberDetailResponse>(
+          `/api/v1/members/${memberId}`,
+          { method: "GET", token },
+        );
         if (cancelled) return;
-        setMe(meRes);
         setOriginal(detail);
 
         setFullName(detail.full_name);
@@ -117,20 +126,26 @@ export default function MemberDetailPage({
         setWhatsappEnabled(detail.profile.whatsapp_enabled);
         setSmsEnabled(detail.profile.sms_enabled);
         setPreferredChannel(detail.profile.preferred_channel);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (cancelled) return;
+        if (isUnauthorized(err)) {
+          clearSessionAndRedirect(router, "session_expired");
+          return;
+        }
+        if (isInactiveAccountError(err)) {
+          clearSessionAndRedirect(router, "account_inactive");
+          return;
+        }
         setError(toErrorMessage(err));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [memberId, token]);
+  }, [memberId, router, token, status, user, isAdmin]);
 
   const patchPreview = useMemo(() => {
     if (!original) return null;
@@ -198,7 +213,7 @@ export default function MemberDetailPage({
     if (!token || !patchPreview) return;
     setSubmitting(true);
     setError(null);
-    setSuccess(null);
+    setSuccess(false);
 
     try {
       const updated = await apiFetch<MemberDetailResponse>(
@@ -206,243 +221,296 @@ export default function MemberDetailPage({
         { method: "PATCH", body: patchPreview as MemberAdminPatch, token },
       );
       setOriginal(updated);
-      setSuccess("Member updated successfully.");
+      setSuccess(true);
     } catch (err) {
+      if (isUnauthorized(err)) {
+        clearSessionAndRedirect(router, "session_expired");
+        return;
+      }
+      if (isInactiveAccountError(err)) {
+        clearSessionAndRedirect(router, "account_inactive");
+        return;
+      }
       setError(toErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   }
 
-  const canSave = !!patchPreview && !submitting && !!original;
+  const canSave = !!patchPreview && !submitting && !!original && isAdmin;
+
+  const inputCls =
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+
+  if (status === "loading") {
+    return (
+      <PageShell
+        title="Member"
+        description="View and update this person’s account and parish profile."
+      >
+        <ContentCard>
+          <div className="flex items-center gap-3 text-sm text-slate-600">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            Checking access…
+          </div>
+        </ContentCard>
+      </PageShell>
+    );
+  }
+
+  if (status === "authenticated" && user && !isAdmin) {
+    return (
+      <PageShell
+        title="Member"
+        description="View and update this person’s account and parish profile."
+      >
+        <ContentCard>
+          <div className="flex items-center gap-3 text-sm text-slate-600">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            Redirecting to your profile…
+          </div>
+        </ContentCard>
+      </PageShell>
+    );
+  }
+
+  if (status !== "authenticated" || !user) {
+    return (
+      <PageShell
+        title="Member"
+        description="View and update this person’s account and parish profile."
+      >
+        {error ? (
+          <ContentCard>
+            <p className="text-sm text-red-800">{error}</p>
+          </ContentCard>
+        ) : null}
+      </PageShell>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Member Details</h1>
-          <p className="text-sm text-slate-600">
-            Admin-only member detail and edit flow.
-          </p>
-        </div>
-
-        <Link href="/members" className="text-sm font-medium text-slate-700 hover:underline">
-          Back to directory
+    <PageShell
+      title={original ? fullName || original.full_name : "Member"}
+      description="View and update this person’s account and parish profile."
+    >
+      <div className="mb-4 flex justify-end">
+        <Link
+          href="/members"
+          className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+        >
+          ← Back to members
         </Link>
       </div>
 
-      {loading ? <p className="text-sm text-slate-600">Loading...</p> : null}
-
-      {error ? (
-        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {error}
-        </div>
+      {loading ? (
+        <ContentCard>
+          <div className="flex items-center gap-3 text-sm text-slate-600">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            Loading…
+          </div>
+        </ContentCard>
       ) : null}
 
-      {success ? (
-        <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          {success}
-        </div>
-      ) : null}
-
-      {!loading && original && !isAdmin ? (
-        <div className="rounded border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Access denied</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Your role is <span className="font-medium text-slate-900">{me?.role}</span>. Admin access is required.
-          </p>
-        </div>
+      {error && !original ? (
+        <ContentCard>
+          <p className="text-sm text-red-800">{error}</p>
+        </ContentCard>
       ) : null}
 
       {!loading && original && isAdmin ? (
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="rounded border border-slate-200 bg-white p-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Full name</label>
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
+          <ContentCard className="space-y-6">
+            {success ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                Changes saved.
               </div>
+            ) : null}
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Login email</label>
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {error}
               </div>
+            ) : null}
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                />
-                <span className="text-sm font-medium text-slate-800">Active</span>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Role</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                >
-                  <option value="admin">admin</option>
-                  <option value="group_leader">group_leader</option>
-                  <option value="member">member</option>
-                </select>
-                <p className="text-xs text-slate-500">
-                  Backend enforces safety (no self-demote; cannot remove last admin).
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded border border-slate-200 bg-white p-4">
-            <div className="text-sm font-semibold text-slate-900">Profile fields</div>
-
-            <div className="mt-3 grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Phone number</label>
-                <input
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Contact email</label>
-                <input
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  type="email"
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-sm font-medium text-slate-800">Address</label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="h-24 w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Marital status</label>
-                <select
-                  value={maritalStatus}
-                  onChange={(e) => setMaritalStatus(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                >
-                  <option value="">(unspecified)</option>
-                  <option value="single">single</option>
-                  <option value="married">married</option>
-                  <option value="widowed">widowed</option>
-                  <option value="divorced">divorced</option>
-                  <option value="separated">separated</option>
-                  <option value="prefer_not_to_say">prefer_not_to_say</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Preferred channel</label>
-                <select
-                  value={preferredChannel}
-                  onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                >
-                  <option value="whatsapp">whatsapp</option>
-                  <option value="sms">sms</option>
-                  <option value="email">email</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Date of birth</label>
-                <input
-                  type="date"
-                  value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Baptism date</label>
-                <input
-                  type="date"
-                  value={baptismDate}
-                  onChange={(e) => setBaptismDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Confirmation date</label>
-                <input
-                  type="date"
-                  value={confirmationDate}
-                  onChange={(e) => setConfirmationDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-800">Join date</label>
-                <input
-                  type="date"
-                  value={joinDate}
-                  onChange={(e) => setJoinDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 md:col-span-2">
-                <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Account
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Full name</label>
+                  <input
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Login email</label>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    className={inputCls}
+                  />
+                </div>
+                <label className="flex items-center gap-2 pt-6 md:pt-0">
                   <input
                     type="checkbox"
-                    checked={whatsappEnabled}
-                    onChange={(e) => setWhatsappEnabled(e.target.checked)}
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="rounded border-slate-300"
                   />
-                  <span className="text-sm font-medium text-slate-800">WhatsApp</span>
+                  <span className="text-sm font-medium text-slate-800">Account active</span>
                 </label>
-
-                <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={smsEnabled}
-                    onChange={(e) => setSmsEnabled(e.target.checked)}
-                  />
-                  <span className="text-sm font-medium text-slate-800">SMS</span>
-                </label>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Role</label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as UserRole)}
+                    className={inputCls}
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="group_leader">Group leader</option>
+                    <option value="member">Member</option>
+                  </select>
+                </div>
               </div>
-            </div>
-          </div>
+            </section>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={!canSave}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-            >
-              {submitting ? "Saving..." : "Save changes"}
-            </button>
-            <p className="text-xs text-slate-500">
-              Forbidden fields are enforced by the backend (including password and role safety rules).
-            </p>
-          </div>
+            <section className="space-y-4 border-t border-slate-100 pt-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Directory profile
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Phone</label>
+                  <input
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Contact email</label>
+                  <input
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    type="email"
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-medium text-slate-800">Address</label>
+                  <textarea
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className={`${inputCls} h-24 resize-none`}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Marital status</label>
+                  <select
+                    value={maritalStatus}
+                    onChange={(e) => setMaritalStatus(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">—</option>
+                    <option value="single">Single</option>
+                    <option value="married">Married</option>
+                    <option value="widowed">Widowed</option>
+                    <option value="divorced">Divorced</option>
+                    <option value="separated">Separated</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Preferred channel</label>
+                  <select
+                    value={preferredChannel}
+                    onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
+                    className={inputCls}
+                  >
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="sms">SMS</option>
+                    <option value="email">Email</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Date of birth</label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Baptism date</label>
+                  <input
+                    type="date"
+                    value={baptismDate}
+                    onChange={(e) => setBaptismDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Confirmation date</label>
+                  <input
+                    type="date"
+                    value={confirmationDate}
+                    onChange={(e) => setConfirmationDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-800">Join date</label>
+                  <input
+                    type="date"
+                    value={joinDate}
+                    onChange={(e) => setJoinDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-4 md:col-span-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={whatsappEnabled}
+                      onChange={(e) => setWhatsappEnabled(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    <span className="text-sm text-slate-800">WhatsApp</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={smsEnabled}
+                      onChange={(e) => setSmsEnabled(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    <span className="text-sm text-slate-800">SMS</span>
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
+              <button
+                type="submit"
+                disabled={!canSave}
+                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              >
+                {submitting ? "Saving…" : "Save changes"}
+              </button>
+              {!patchPreview ? (
+                <span className="text-sm text-slate-500">Change a field to enable saving.</span>
+              ) : null}
+            </div>
+          </ContentCard>
         </form>
       ) : null}
-    </div>
+    </PageShell>
   );
 }
-

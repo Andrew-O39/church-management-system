@@ -1,22 +1,23 @@
 import type { ReactNode } from "react";
 
 import "./globals.css";
-import TopNav from "../components/layout/TopNav";
+import AppHeader from "../components/layout/AppHeader";
+import { Providers } from "./providers";
 
 export const metadata = {
   title: "Church Management System",
-  description: "A modern church admin platform (foundation scaffold)",
+  description: "Member directory, profiles, and church administration.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <header className="border-b bg-white">
-          <TopNav />
-        </header>
+        <Providers>
+          <AppHeader />
 
-        <main className="mx-auto max-w-5xl p-6">{children}</main>
+          <main className="mx-auto max-w-5xl p-6">{children}</main>
+        </Providers>
       </body>
     </html>
   );

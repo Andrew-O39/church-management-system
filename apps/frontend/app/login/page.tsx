@@ -1,55 +1,38 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { apiFetch, type ApiError } from "lib/api";
-import { getAccessToken } from "lib/session";
-import { loginAndFetchMe } from "lib/auth";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import type { MeResponse } from "lib/types";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "components/providers/AuthProvider";
+import { loginAndFetchMe, resolvePostAuthPath } from "lib/auth";
+import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
+import PageShell, { ContentCard } from "components/layout/PageShell";
 
-function toErrorMessage(err: unknown) {
-  if (typeof err === "object" && err && "status" in err) {
-    const e = err as ApiError;
-    if (e.detail) return e.detail;
-    return `Request failed (${e.status})`;
-  }
-  return err instanceof Error ? err.message : "Request failed";
-}
+const REASON_MESSAGES: Record<string, string> = {
+  signed_out: "You have been signed out.",
+  session_expired: "Your session expired. Please sign in again.",
+  account_inactive: "This account is inactive. Contact an administrator for help.",
+};
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const { user, status } = useAuth();
 
   const fromPath = params.get("from") ?? "";
+  const reason = params.get("reason") ?? "";
+  const reasonMessage = reason ? REASON_MESSAGES[reason] ?? null : null;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [checkingExistingSession, setCheckingExistingSession] = useState(true);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
-      setCheckingExistingSession(false);
-      return;
-    }
-
-    apiFetch<MeResponse>("/api/v1/auth/me", { method: "GET", token })
-      .then((me) => {
-        const target =
-          fromPath && (fromPath.startsWith("/profile") || fromPath.startsWith("/members"))
-            ? fromPath
-            : me.role === "admin"
-              ? "/members"
-              : "/profile";
-        router.replace(target);
-      })
-      .catch(() => {
-        setCheckingExistingSession(false);
-      });
-  }, [fromPath, router]);
+    if (status !== "authenticated" || !user) return;
+    router.replace(resolvePostAuthPath(fromPath || undefined, user));
+  }, [status, user, fromPath, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -57,15 +40,15 @@ export default function LoginPage() {
     setError(null);
     try {
       const { me } = await loginAndFetchMe({ email, password });
-      const target =
-        fromPath && (fromPath.startsWith("/profile") || fromPath.startsWith("/members"))
-          ? fromPath
-          : me.role === "admin"
-            ? "/members"
-            : "/profile";
-      router.replace(target);
+      router.replace(resolvePostAuthPath(fromPath || undefined, me));
     } catch (err) {
-      setError(toErrorMessage(err));
+      if (isUnauthorized(err)) {
+        setError("Incorrect email or password.");
+      } else if (isInactiveAccountError(err)) {
+        setError(REASON_MESSAGES.account_inactive);
+      } else {
+        setError(toErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -77,58 +60,90 @@ export default function LoginPage() {
   );
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Login</h1>
+    <PageShell
+      title="Sign in"
+      description="Use the email and password for your church account."
+    >
+      <ContentCard>
+        {status === "loading" ? (
+          <p className="text-sm text-slate-600">Checking your session…</p>
+        ) : (
+          <div className="space-y-4">
+            {reasonMessage ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {reasonMessage}
+              </div>
+            ) : null}
 
-      {checkingExistingSession ? (
-        <p className="text-sm text-slate-600">Checking session...</p>
-      ) : (
-        <>
-          {error ? (
-            <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              {error}
-            </div>
-          ) : null}
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {error}
+              </div>
+            ) : null}
 
-          <form onSubmit={onSubmit} className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-800">Email</label>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                autoComplete="username"
-              />
-            </div>
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="login-email" className="text-sm font-medium text-slate-800">
+                  Email
+                </label>
+                <input
+                  id="login-email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  autoComplete="username"
+                />
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-800">Password</label>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-                autoComplete="current-password"
-              />
-            </div>
+              <div className="space-y-1.5">
+                <label htmlFor="login-password" className="text-sm font-medium text-slate-800">
+                  Password
+                </label>
+                <input
+                  id="login-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  autoComplete="current-password"
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={submitDisabled}
-              className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-            >
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={submitDisabled}
+                className="w-full rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              >
+                {loading ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
 
-          <p className="text-xs text-slate-500">
-            Uses access tokens only (no refresh tokens yet). Logging in again may be
-            required when the token expires.
-          </p>
-        </>
-      )}
-    </div>
+            <p className="text-center text-sm text-slate-600">
+              New here?{" "}
+              <Link href="/register" className="font-medium text-slate-900 underline underline-offset-2">
+                Create an account
+              </Link>
+            </p>
+          </div>
+        )}
+      </ContentCard>
+    </PageShell>
   );
 }
 
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell title="Sign in" description="Loading…">
+          <ContentCard>
+            <p className="text-sm text-slate-600">Loading…</p>
+          </ContentCard>
+        </PageShell>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
