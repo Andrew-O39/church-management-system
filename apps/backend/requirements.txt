@@ -1,0 +1,16 @@
+# Church Management System — backend (pip)
+# Python 3.12+
+# Install: pip install -r requirements.txt
+# (Poetry is still supported via pyproject.toml; this file mirrors runtime deps.)
+
+fastapi>=0.110.0,<0.120.0
+uvicorn[standard]>=0.27.0,<0.33.0
+pydantic-settings>=2.2.1,<3.0.0
+SQLAlchemy>=2.0.30,<3.0.0
+asyncpg>=0.29.0,<0.31.0
+alembic>=1.13.1,<2.0.0
+python-dotenv>=1.0.1,<2.0.0
+
+passlib[bcrypt]>=1.7.4,<2.0.0
+PyJWT>=2.8.0,<3.0.0
+email-validator>=2.1.0,<3.0.0

@@ -1,0 +1,61 @@
+[tool.poetry]
+name = "church-management-backend"
+version = "0.1.0"
+description = "Church Management System backend (scaffold)"
+authors = ["Church CMS Team <team@example.com>"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+fastapi = "^0.110.0"
+uvicorn = { version = "^0.27.0", extras = ["standard"] }
+pydantic-settings = "^2.2.1"
+
+SQLAlchemy = "^2.0.30"
+asyncpg = "^0.29.0"
+
+alembic = "^1.13.1"
+
+python-dotenv = "^1.0.1"
+
+passlib = { version = "^1.7.4", extras = ["bcrypt"] }
+bcrypt = "4.0.1"
+PyJWT = "^2.8.0"
+email-validator = "^2.1.0"
+greenlet = "^3.3.2"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.0"
+black = "^24.4.2"
+mypy = "^1.10.0"
+pytest = "^8.2.0"
+pytest-asyncio = "^0.23.7"
+httpx = "^0.27.0"
+aiosqlite = "^0.20.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+lint.select = ["E", "F", "I", "UP", "B", "C4", "B9"]
+lint.ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
