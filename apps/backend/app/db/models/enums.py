@@ -30,3 +30,23 @@ class MinistryRoleInMinistry(str, enum.Enum):
     MEMBER = "member"
     LEADER = "leader"
     COORDINATOR = "coordinator"
+
+
+class EventType(str, enum.Enum):
+    SERVICE = "service"
+    MEETING = "meeting"
+    REHEARSAL = "rehearsal"
+    RETREAT = "retreat"
+    CONFERENCE = "conference"
+    OTHER = "other"
+
+
+class EventVisibility(str, enum.Enum):
+    PUBLIC = "public"
+    INTERNAL = "internal"
+
+
+class AttendanceStatus(str, enum.Enum):
+    PRESENT = "present"
+    ABSENT = "absent"
+    EXCUSED = "excused"

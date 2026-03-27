@@ -9,6 +9,7 @@ export function resolvePostAuthPath(
   user: MeResponse,
 ): string {
   if (fromPath?.startsWith("/profile")) return fromPath;
+  if (fromPath?.startsWith("/events")) return fromPath;
   if (fromPath?.startsWith("/ministries")) return fromPath;
   if (fromPath?.startsWith("/members")) {
     return user.role === "admin" ? fromPath : "/profile?notice=admin_only";

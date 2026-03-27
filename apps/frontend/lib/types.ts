@@ -163,3 +163,77 @@ export type MyMinistriesResponse = {
   items: MyMinistryItem[];
 };
 
+export type EventType =
+  | "service"
+  | "meeting"
+  | "rehearsal"
+  | "retreat"
+  | "conference"
+  | "other";
+
+export type EventVisibility = "public" | "internal";
+
+export type EventListItem = {
+  event_id: string;
+  title: string;
+  description: string | null;
+  event_type: EventType;
+  start_at: string;
+  end_at: string;
+  location: string;
+  is_active: boolean;
+  visibility: EventVisibility;
+  ministry_id: string | null;
+  ministry_name: string | null;
+};
+
+export type EventDetailResponse = EventListItem & {
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventListResponse = {
+  items: EventListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type MyEventsResponse = {
+  items: EventListItem[];
+};
+
+export type EventMemberViewResponse = Omit<
+  EventListItem,
+  "is_active" | "visibility"
+> & {
+  is_active: boolean;
+  visibility: EventVisibility;
+};
+
+export type AttendanceStatus = "present" | "absent" | "excused";
+
+export type AttendanceRow = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  user_full_name: string;
+  user_email: string;
+  status: AttendanceStatus;
+  recorded_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventAttendanceListResponse = {
+  items: AttendanceRow[];
+};
+
+export type MyAttendanceResponse = {
+  event_id: string;
+  user_id: string;
+  status: AttendanceStatus | null;
+  recorded: boolean;
+};
+

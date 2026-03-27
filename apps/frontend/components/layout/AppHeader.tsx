@@ -90,6 +90,12 @@ export default function AppHeader() {
               <NavLink href="/profile" active={pathname === "/profile"}>
                 Profile
               </NavLink>
+              <NavLink
+                href="/events"
+                active={pathname === "/events" || pathname.startsWith("/events/")}
+              >
+                Events
+              </NavLink>
               {status === "authenticated" ? (
                 <NavLink
                   href="/ministries"
