@@ -132,7 +132,8 @@ async def test_admin_add_member_to_ministry(client: AsyncClient, session_factory
     )
     assert r.status_code == 201, r.text
     row = r.json()
-    assert row["user_id"] == uid
+    assert row["linked_user_id"] == uid
+    assert row["church_member_id"] == member["user"]["member_id"]
     assert row["email"] == "joiner@example.com"
 
     d = await client.get(
@@ -264,7 +265,7 @@ async def test_member_can_view_own_ministry_detail_not_full_roster(
     assert r.status_code == 200, r.text
     members = r.json()["members"]
     assert len(members) == 1
-    assert members[0]["user_id"] == uid_a
+    assert members[0]["linked_user_id"] == uid_a
 
 
 @pytest.mark.asyncio

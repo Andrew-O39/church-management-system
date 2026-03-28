@@ -104,6 +104,14 @@ export default function AppHeader() {
                   Ministries
                 </NavLink>
               ) : null}
+              {status === "authenticated" ? (
+                <NavLink
+                  href="/volunteers"
+                  active={pathname === "/volunteers"}
+                >
+                  Volunteers
+                </NavLink>
+              ) : null}
               {status === "authenticated" && isAdmin ? (
                 <NavLink
                   href="/members"

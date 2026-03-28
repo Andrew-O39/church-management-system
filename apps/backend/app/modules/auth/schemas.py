@@ -28,6 +28,7 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    member_id: uuid.UUID | None = None
     full_name: str
     email: EmailStr
     is_active: bool

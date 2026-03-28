@@ -32,3 +32,7 @@ export function isForbidden(err: unknown): boolean {
 export function isInactiveAccountError(err: unknown): boolean {
   return isForbidden(err) && getApiErrorDetail(err) === INACTIVE_USER_HTTP_DETAIL;
 }
+
+export function isConflictError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "status" in err && (err as ApiError).status === 409;
+}

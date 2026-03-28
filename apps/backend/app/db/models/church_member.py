@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Text, Uuid, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base
+from app.db.models.enums import ChurchMembershipStatus, Gender, MaritalStatus
+
+if TYPE_CHECKING:
+    from app.db.models.ministry_membership import MinistryMembership
+    from app.db.models.user import User
+
+
+class ChurchMember(Base):
+    """Canonical parishioner record: one row per real person in the parish.
+
+    This is NOT a login account. Use User for authentication; User.member_id optionally
+    points here. Domain logic (ministries, attendance, volunteers) keys on ChurchMember.id
+    (church_member_id), never on user_id.
+    """
+
+    __tablename__ = "church_members"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    first_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    middle_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    last_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
+
+    gender: Mapped[Gender] = mapped_column(
+        Enum(Gender, native_enum=False, values_callable=lambda e: [i.value for i in e]),
+        nullable=False,
+        default=Gender.UNKNOWN,
+    )
+    date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    occupation: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    marital_status: Mapped[MaritalStatus | None] = mapped_column(
+        Enum(
+            MaritalStatus,
+            native_enum=False,
+            values_callable=lambda e: [i.value for i in e],
+        ),
+        nullable=True,
+    )
+    preferred_language: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    registration_number: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    membership_status: Mapped[ChurchMembershipStatus] = mapped_column(
+        Enum(
+            ChurchMembershipStatus,
+            native_enum=False,
+            values_callable=lambda e: [i.value for i in e],
+        ),
+        nullable=False,
+        default=ChurchMembershipStatus.ACTIVE,
+        index=True,
+    )
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    is_baptized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    baptism_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    baptism_place: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    is_communicant: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    first_communion_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    first_communion_place: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    confirmation_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    confirmation_place: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    is_married: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    marriage_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    marriage_place: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    spouse_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    father_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mother_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    emergency_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    emergency_contact_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    is_deceased: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    date_of_death: Mapped[date | None] = mapped_column(Date, nullable=True)
+    funeral_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    burial_place: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cause_of_death: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    linked_user: Mapped["User | None"] = relationship(
+        "User",
+        back_populates="church_member",
+        primaryjoin="ChurchMember.id == User.member_id",
+        foreign_keys="User.member_id",
+        uselist=False,
+    )
+    ministry_memberships: Mapped[list["MinistryMembership"]] = relationship(
+        back_populates="church_member",
+        foreign_keys="MinistryMembership.church_member_id",
+        cascade="all, delete-orphan",
+    )

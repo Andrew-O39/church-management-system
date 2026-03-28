@@ -4,19 +4,26 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, String, Uuid, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.models.enums import UserRole
 
 if TYPE_CHECKING:
+    from app.db.models.church_member import ChurchMember
     from app.db.models.member_profile import MemberProfile
     from app.db.models.ministry_group import MinistryGroup
-    from app.db.models.ministry_membership import MinistryMembership
 
 
 class User(Base):
+    """Login account (email/password). Not the parish registry.
+
+    member_id links this account to at most one ChurchMember for self-service and roster
+    resolution. Use user_id only for auth and audit fields (e.g. recorded_by_user_id);
+    prefer church_member_id for ministries, attendance, and volunteers.
+    """
+
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -37,6 +44,13 @@ class User(Base):
         nullable=False,
         default=UserRole.MEMBER,
     )
+    member_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("church_members.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -47,6 +61,11 @@ class User(Base):
         nullable=False,
     )
 
+    church_member: Mapped["ChurchMember | None"] = relationship(
+        "ChurchMember",
+        back_populates="linked_user",
+        foreign_keys=[member_id],
+    )
     member_profile: Mapped["MemberProfile"] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -55,9 +74,4 @@ class User(Base):
     led_ministries: Mapped[list["MinistryGroup"]] = relationship(
         back_populates="leader",
         foreign_keys="MinistryGroup.leader_user_id",
-    )
-    ministry_memberships: Mapped[list["MinistryMembership"]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-        foreign_keys="MinistryMembership.user_id",
     )

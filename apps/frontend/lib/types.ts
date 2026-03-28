@@ -17,6 +17,7 @@ export type JwtTokenResponse = {
 
 export type UserOut = {
   id: string;
+  member_id: string | null;
   full_name: string;
   email: string;
   is_active: boolean;
@@ -217,9 +218,10 @@ export type AttendanceStatus = "present" | "absent" | "excused";
 export type AttendanceRow = {
   id: string;
   event_id: string;
-  user_id: string;
-  user_full_name: string;
-  user_email: string;
+  church_member_id: string;
+  member_full_name: string;
+  member_email: string | null;
+  linked_user_id: string | null;
   status: AttendanceStatus;
   recorded_by_user_id: string;
   created_at: string;
@@ -233,7 +235,77 @@ export type EventAttendanceListResponse = {
 export type MyAttendanceResponse = {
   event_id: string;
   user_id: string;
+  church_member_id: string | null;
   status: AttendanceStatus | null;
   recorded: boolean;
+};
+
+export type VolunteerRoleListItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  ministry_id: string | null;
+  ministry_name: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VolunteerRoleListResponse = {
+  items: VolunteerRoleListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type VolunteerAssignmentRow = {
+  id: string;
+  event_id: string;
+  church_member_id: string;
+  member_full_name: string;
+  member_email: string | null;
+  linked_user_id: string | null;
+  linked_user_email: string | null;
+  user_id: string | null;
+  user_full_name: string;
+  user_email: string;
+  role_id: string;
+  role_name: string;
+  notes: string | null;
+  assigned_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** GET /api/v1/church-members/eligible-for-event/{eventId} */
+export type EligibleChurchMemberListItem = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+};
+
+export type EventVolunteerListResponse = {
+  items: VolunteerAssignmentRow[];
+};
+
+export type MyVolunteerAssignmentItem = {
+  assignment_id: string;
+  event_id: string;
+  event_title: string;
+  start_at: string;
+  end_at: string;
+  location: string;
+  role_id: string;
+  role_name: string;
+  notes: string | null;
+};
+
+export type MyVolunteerAssignmentsResponse = {
+  items: MyVolunteerAssignmentItem[];
+};
+
+export type MyEventVolunteerAssignmentsResponse = {
+  items: VolunteerAssignmentRow[];
 };
 

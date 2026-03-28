@@ -4,20 +4,27 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Uuid, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Text, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.db.models.enums import AttendanceStatus
 
 if TYPE_CHECKING:
+    from app.db.models.church_event import ChurchEvent
     from app.db.models.church_member import ChurchMember
+    from app.db.models.user import User
+    from app.db.models.volunteer_role import VolunteerRole
 
 
-class EventAttendance(Base):
-    __tablename__ = "event_attendance"
+class VolunteerAssignment(Base):
+    __tablename__ = "volunteer_assignments"
     __table_args__ = (
-        UniqueConstraint("event_id", "church_member_id", name="uq_event_attendance_event_member"),
+        UniqueConstraint(
+            "event_id",
+            "church_member_id",
+            "role_id",
+            name="uq_volunteer_assignment_event_member_role",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -25,6 +32,7 @@ class EventAttendance(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+
     event_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("church_events.id", ondelete="CASCADE"),
@@ -37,21 +45,22 @@ class EventAttendance(Base):
         nullable=False,
         index=True,
     )
-    status: Mapped[AttendanceStatus] = mapped_column(
-        Enum(
-            AttendanceStatus,
-            native_enum=False,
-            values_callable=lambda e: [i.value for i in e],
-        ),
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("volunteer_roles.id", ondelete="RESTRICT"),
         nullable=False,
-        default=AttendanceStatus.PRESENT,
+        index=True,
     )
-    recorded_by_user_id: Mapped[uuid.UUID] = mapped_column(
+
+    notes: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
+    assigned_by_user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -62,6 +71,19 @@ class EventAttendance(Base):
         nullable=False,
     )
 
-    church_member: Mapped["ChurchMember"] = relationship(
+    event: Mapped["ChurchEvent | None"] = relationship(
+        foreign_keys=[event_id],
+        lazy="selectin",
+    )
+    role: Mapped["VolunteerRole | None"] = relationship(
+        foreign_keys=[role_id],
+        lazy="selectin",
+    )
+    assigned_by: Mapped["User | None"] = relationship(
+        foreign_keys=[assigned_by_user_id],
+        lazy="selectin",
+    )
+    church_member: Mapped["ChurchMember | None"] = relationship(
         foreign_keys=[church_member_id],
+        lazy="selectin",
     )

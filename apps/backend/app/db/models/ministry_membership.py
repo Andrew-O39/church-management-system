@@ -11,19 +11,18 @@ from app.db.base import Base
 from app.db.models.enums import MinistryRoleInMinistry
 
 if TYPE_CHECKING:
+    from app.db.models.church_member import ChurchMember
     from app.db.models.ministry_group import MinistryGroup
-    from app.db.models.user import User
 
 
 class MinistryMembership(Base):
     """
-    One row per (ministry, user). Uniqueness is enforced on (ministry_id, user_id).
-    Leaving a ministry sets is_active=False; re-joining reactivates the same row.
+    One row per (ministry, church_member). Tracks parishioners in a ministry, with or without login.
     """
 
     __tablename__ = "ministry_memberships"
     __table_args__ = (
-        UniqueConstraint("ministry_id", "user_id", name="uq_ministry_membership_ministry_user"),
+        UniqueConstraint("ministry_id", "church_member_id", name="uq_ministry_membership_ministry_member"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -37,9 +36,9 @@ class MinistryMembership(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    church_member_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("church_members.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -67,4 +66,7 @@ class MinistryMembership(Base):
     )
 
     ministry: Mapped["MinistryGroup"] = relationship(back_populates="memberships")
-    user: Mapped["User"] = relationship(back_populates="ministry_memberships")
+    church_member: Mapped["ChurchMember"] = relationship(
+        back_populates="ministry_memberships",
+        foreign_keys=[church_member_id],
+    )

@@ -11,7 +11,9 @@ function isProtectedPath(pathname: string) {
     pathname === "/events" ||
     pathname.startsWith("/events/") ||
     pathname === "/ministries" ||
-    pathname.startsWith("/ministries/")
+    pathname.startsWith("/ministries/") ||
+    pathname === "/volunteers" ||
+    pathname.startsWith("/volunteers/")
   );
 }
 
@@ -34,6 +36,13 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/profile/:path*", "/members/:path*", "/events/:path*", "/ministries/:path*"],
+  matcher: [
+    "/profile/:path*",
+    "/members/:path*",
+    "/events/:path*",
+    "/ministries/:path*",
+    "/volunteers",
+    "/volunteers/:path*",
+  ],
 };
 

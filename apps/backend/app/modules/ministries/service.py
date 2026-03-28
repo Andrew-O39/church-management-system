@@ -6,14 +6,17 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.normalization import normalize_email
+from app.db.models.church_member import ChurchMember
 from app.db.models.enums import MinistryRoleInMinistry
 from app.db.models.ministry_group import MinistryGroup
 from app.db.models.ministry_membership import MinistryMembership
 from app.db.models.user import User
 from app.modules.auth import service as auth_service
+from app.modules.church_registry import service as registry_service
+from app.modules.church_registry.person_display import contact_email, linked_account_fields
 from app.modules.ministries.schemas import (
     MinistryCreate,
     MinistryDetailResponse,
@@ -124,7 +127,9 @@ async def load_memberships_for_ministry(
     stmt = (
         select(MinistryMembership)
         .where(MinistryMembership.ministry_id == ministry_id)
-        .options(selectinload(MinistryMembership.user))
+        .options(
+            selectinload(MinistryMembership.church_member).joinedload(ChurchMember.linked_user),
+        )
         .order_by(MinistryMembership.joined_at.asc())
     )
     if active_only:
@@ -134,12 +139,18 @@ async def load_memberships_for_ministry(
 
 
 def membership_to_row(mm: MinistryMembership) -> MinistryMemberRow:
-    u = mm.user
+    cm = mm.church_member
+    lu = cm.linked_user if cm is not None else None
+    uid, ufn, uem = linked_account_fields(lu)
     return MinistryMemberRow(
         membership_id=mm.id,
-        user_id=u.id,
-        full_name=u.full_name,
-        email=u.email,
+        church_member_id=cm.id,
+        full_name=cm.full_name,
+        email=contact_email(church_member=cm, linked_user=lu),
+        linked_user_id=uid,
+        user_id=uid,
+        user_full_name=ufn,
+        user_email=uem,
         role_in_ministry=mm.role_in_ministry,
         is_active=mm.is_active,
         joined_at=mm.joined_at,
@@ -166,16 +177,23 @@ async def ministry_detail_for_admin(
 async def ministry_detail_for_member(
     session: AsyncSession,
     ministry: MinistryGroup,
-    viewer_id: uuid.UUID,
+    viewer: User,
 ) -> MinistryDetailResponse:
+    if viewer.member_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an active member of this ministry",
+        )
     stmt = (
         select(MinistryMembership)
         .where(
             MinistryMembership.ministry_id == ministry.id,
-            MinistryMembership.user_id == viewer_id,
+            MinistryMembership.church_member_id == viewer.member_id,
             MinistryMembership.is_active.is_(True),
         )
-        .options(selectinload(MinistryMembership.user))
+        .options(
+            selectinload(MinistryMembership.church_member).joinedload(ChurchMember.linked_user),
+        )
     )
     res = await session.execute(stmt)
     mm = res.scalar_one_or_none()
@@ -257,21 +275,31 @@ async def patch_ministry(
     return ministry
 
 
-async def resolve_target_user(
+async def resolve_target_church_member_id(
     session: AsyncSession,
     body: MinistryMembershipCreate,
-) -> User:
+) -> uuid.UUID:
+    if body.church_member_id is not None:
+        await registry_service.get_church_member_or_404(session, body.church_member_id)
+        return body.church_member_id
+    u: User | None = None
     if body.user_id is not None:
-        return await assert_user_exists(session, body.user_id)
-    assert body.email is not None
-    em = normalize_email(str(body.email))
-    u = await auth_service.get_user_by_email(session, em)
-    if u is None:
+        u = await assert_user_exists(session, body.user_id)
+    else:
+        assert body.email is not None
+        em = normalize_email(str(body.email))
+        u = await auth_service.get_user_by_email(session, em)
+        if u is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No user found for that email",
+            )
+    if u.member_id is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No user found for that email",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not linked to a church member record",
         )
-    return u
+    return u.member_id
 
 
 async def add_or_reactivate_membership(
@@ -284,11 +312,11 @@ async def add_or_reactivate_membership(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot add members to an inactive ministry",
         )
-    target = await resolve_target_user(session, body)
+    cm_id = await resolve_target_church_member_id(session, body)
 
     stmt = select(MinistryMembership).where(
         MinistryMembership.ministry_id == ministry.id,
-        MinistryMembership.user_id == target.id,
+        MinistryMembership.church_member_id == cm_id,
     )
     res = await session.execute(stmt)
     mm = res.scalar_one_or_none()
@@ -296,39 +324,47 @@ async def add_or_reactivate_membership(
     if mm is None:
         mm = MinistryMembership(
             ministry_id=ministry.id,
-            user_id=target.id,
+            church_member_id=cm_id,
             role_in_ministry=body.role_in_ministry,
             is_active=True,
         )
         session.add(mm)
         await session.commit()
         await session.refresh(mm)
-        mm.user = target
+        await session.refresh(mm, attribute_names=["church_member"])
+        await session.refresh(mm.church_member, attribute_names=["linked_user"])
         return mm
 
     if mm.is_active:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="User is already an active member of this ministry",
+            detail="Member is already an active member of this ministry",
         )
 
     mm.is_active = True
     mm.role_in_ministry = body.role_in_ministry
     await session.commit()
     await session.refresh(mm)
-    mm.user = target
+    await session.refresh(mm, attribute_names=["church_member"])
+    await session.refresh(mm.church_member, attribute_names=["linked_user"])
     return mm
 
 
 async def patch_membership(
     session: AsyncSession,
     ministry_id: uuid.UUID,
-    user_id: uuid.UUID,
+    church_member_id: uuid.UUID,
     body: MinistryMembershipPatch,
 ) -> MinistryMembership:
-    stmt = select(MinistryMembership).where(
-        MinistryMembership.ministry_id == ministry_id,
-        MinistryMembership.user_id == user_id,
+    stmt = (
+        select(MinistryMembership)
+        .where(
+            MinistryMembership.ministry_id == ministry_id,
+            MinistryMembership.church_member_id == church_member_id,
+        )
+        .options(
+            selectinload(MinistryMembership.church_member).joinedload(ChurchMember.linked_user),
+        )
     )
     res = await session.execute(stmt)
     mm = res.scalar_one_or_none()
@@ -343,20 +379,17 @@ async def patch_membership(
 
     await session.commit()
     await session.refresh(mm)
-    u = await get_user_by_id(session, user_id)
-    if u:
-        mm.user = u
     return mm
 
 
 async def deactivate_membership(
     session: AsyncSession,
     ministry_id: uuid.UUID,
-    user_id: uuid.UUID,
+    church_member_id: uuid.UUID,
 ) -> None:
     stmt = select(MinistryMembership).where(
         MinistryMembership.ministry_id == ministry_id,
-        MinistryMembership.user_id == user_id,
+        MinistryMembership.church_member_id == church_member_id,
     )
     res = await session.execute(stmt)
     mm = res.scalar_one_or_none()
@@ -366,12 +399,14 @@ async def deactivate_membership(
     await session.commit()
 
 
-async def list_my_ministries(session: AsyncSession, user_id: uuid.UUID) -> list[MyMinistryItem]:
+async def list_my_ministries(session: AsyncSession, user: User) -> list[MyMinistryItem]:
+    if user.member_id is None:
+        return []
     stmt = (
         select(MinistryMembership, MinistryGroup)
         .join(MinistryGroup, MinistryGroup.id == MinistryMembership.ministry_id)
         .where(
-            MinistryMembership.user_id == user_id,
+            MinistryMembership.church_member_id == user.member_id,
             MinistryMembership.is_active.is_(True),
         )
         .order_by(MinistryGroup.name.asc())

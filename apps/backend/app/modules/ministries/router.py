@@ -32,7 +32,7 @@ async def list_my_ministries(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     user: Annotated[User, Depends(get_current_active_user)],
 ) -> MyMinistriesResponse:
-    items = await ministries_service.list_my_ministries(session, user.id)
+    items = await ministries_service.list_my_ministries(session, user)
     return MyMinistriesResponse(items=items)
 
 
@@ -80,7 +80,7 @@ async def get_ministry(
     m = await ministries_service.get_ministry_or_404(session, ministry_id)
     if user.role == UserRole.ADMIN:
         return await ministries_service.ministry_detail_for_admin(session, m)
-    return await ministries_service.ministry_detail_for_member(session, m, user.id)
+    return await ministries_service.ministry_detail_for_member(session, m, user)
 
 
 @router.patch("/{ministry_id}", response_model=MinistryDetailResponse)
@@ -108,46 +108,46 @@ async def add_ministry_member(
 ) -> MinistryMemberRow:
     m = await ministries_service.get_ministry_or_404(session, ministry_id)
     mm = await ministries_service.add_or_reactivate_membership(session, m, body)
-    if mm.user is None:
+    if mm.church_member is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Membership user not loaded",
+            detail="Membership church member not loaded",
         )
     return ministries_service.membership_to_row(mm)
 
 
 @router.patch(
-    "/{ministry_id}/members/{user_id}",
+    "/{ministry_id}/members/{church_member_id}",
     response_model=MinistryMemberRow,
 )
 async def patch_ministry_member(
     ministry_id: uuid.UUID,
-    user_id: uuid.UUID,
+    church_member_id: uuid.UUID,
     body: MinistryMembershipPatch,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> MinistryMemberRow:
     await ministries_service.get_ministry_or_404(session, ministry_id)
-    mm = await ministries_service.patch_membership(session, ministry_id, user_id, body)
-    if mm.user is None:
+    mm = await ministries_service.patch_membership(session, ministry_id, church_member_id, body)
+    if mm.church_member is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Membership user not loaded",
+            detail="Membership church member not loaded",
         )
     return ministries_service.membership_to_row(mm)
 
 
 @router.delete(
-    "/{ministry_id}/members/{user_id}",
+    "/{ministry_id}/members/{church_member_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
 )
 async def remove_ministry_member(
     ministry_id: uuid.UUID,
-    user_id: uuid.UUID,
+    church_member_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> Response:
     await ministries_service.get_ministry_or_404(session, ministry_id)
-    await ministries_service.deactivate_membership(session, ministry_id, user_id)
+    await ministries_service.deactivate_membership(session, ministry_id, church_member_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

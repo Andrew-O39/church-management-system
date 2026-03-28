@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.db.models.enums import AttendanceStatus
 
@@ -13,9 +13,14 @@ class AttendanceRow(BaseModel):
 
     id: uuid.UUID
     event_id: uuid.UUID
-    user_id: uuid.UUID
-    user_full_name: str
-    user_email: str
+    church_member_id: uuid.UUID
+    member_full_name: str
+    member_email: str | None
+    contact_email: str | None
+    linked_user_id: uuid.UUID | None
+    user_id: uuid.UUID | None
+    user_full_name: str | None
+    user_email: str | None
     status: AttendanceStatus
     recorded_by_user_id: uuid.UUID
     created_at: datetime
@@ -23,8 +28,15 @@ class AttendanceRow(BaseModel):
 
 
 class AttendanceCreateInput(BaseModel):
-    user_id: uuid.UUID
+    church_member_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
     status: AttendanceStatus
+
+    @model_validator(mode="after")
+    def exactly_one_subject(self) -> AttendanceCreateInput:
+        if sum(1 for x in (self.church_member_id, self.user_id) if x is not None) != 1:
+            raise ValueError("Provide exactly one of church_member_id or user_id")
+        return self
 
 
 class AttendancePatchInput(BaseModel):
@@ -38,6 +50,6 @@ class EventAttendanceListResponse(BaseModel):
 class MyAttendanceResponse(BaseModel):
     event_id: uuid.UUID
     user_id: uuid.UUID
+    church_member_id: uuid.UUID | None
     status: AttendanceStatus | None
     recorded: bool
-

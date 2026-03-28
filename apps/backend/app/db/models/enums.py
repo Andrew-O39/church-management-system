@@ -50,3 +50,19 @@ class AttendanceStatus(str, enum.Enum):
     PRESENT = "present"
     ABSENT = "absent"
     EXCUSED = "excused"
+
+
+class Gender(str, enum.Enum):
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+    PREFER_NOT_TO_SAY = "prefer_not_to_say"
+
+
+class ChurchMembershipStatus(str, enum.Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    VISITOR = "visitor"
+    TRANSFERRED = "transferred"
+    DECEASED = "deceased"
