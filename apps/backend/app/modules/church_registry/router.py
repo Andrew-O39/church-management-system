@@ -82,6 +82,7 @@ async def get_my_church_member(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     user: Annotated[User, Depends(get_current_active_user)],
 ) -> ChurchMemberDetailResponse:
+    """Compatibility: resolve registry row tied to the current user, if any."""
     return await registry_service.get_my_church_member_profile(session, user=user)
 
 
@@ -113,5 +114,6 @@ async def link_church_member_user(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> ChurchMemberDetailResponse:
+    """Optional admin/maintenance: attach a login to a registry row. Not part of primary product UX."""
     cm = await registry_service.get_church_member_or_404(session, member_id)
     return await registry_service.link_user_to_member(session, cm=cm, user_id=body.user_id)

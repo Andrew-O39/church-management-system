@@ -231,7 +231,10 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
   }
 
   return (
-    <PageShell title={detail.name} description="Ministry / group details and membership.">
+    <PageShell
+      title={detail.name}
+      description="Membership is based on app accounts (the member directory). Official parish registry records are a separate admin function."
+    >
       <div className="mb-4">
         <Link href="/ministries" className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
           ← All ministries

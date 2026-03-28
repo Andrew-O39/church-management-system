@@ -10,7 +10,6 @@ from app.core.normalization import normalize_email
 from app.db.models.enums import PreferredChannel, UserRole
 from app.db.models.member_profile import MemberProfile
 from app.db.models.user import User
-from app.modules.church_registry import service as registry_service
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
@@ -34,7 +33,7 @@ async def create_registered_user(
     email: str,
     password: str,
 ) -> User:
-    """Create user + empty member profile. Caller must ensure email is available."""
+    """Create an app login + ``MemberProfile`` only. Does not create parish registry rows."""
     normalized_email = normalize_email(email)
 
     user = User(
@@ -50,10 +49,6 @@ async def create_registered_user(
         preferred_channel=PreferredChannel.WHATSAPP,
     )
     session.add(user)
-    await session.flush()
-    await session.refresh(user, attribute_names=["member_profile"])
-    cm = await registry_service.create_member_for_registered_user(session, user)
-    user.member_id = cm.id
     await session.commit()
     await session.refresh(user)
     return user

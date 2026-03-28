@@ -20,7 +20,7 @@ async def test_register_success(client: AsyncClient) -> None:
     assert body["token_type"] == "bearer"
     assert body["user"]["email"] == "member@example.com"
     assert body["user"]["role"] == "member"
-    assert body["user"]["member_id"]
+    assert body["user"]["member_id"] is None
 
 
 @pytest.mark.asyncio

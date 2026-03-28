@@ -113,12 +113,24 @@ export default function AppHeader() {
                 </NavLink>
               ) : null}
               {status === "authenticated" && isAdmin ? (
-                <NavLink
-                  href="/members"
-                  active={pathname === "/members" || pathname.startsWith("/members/")}
-                >
-                  Members
-                </NavLink>
+                <>
+                  <NavLink
+                    href="/members"
+                    active={
+                      pathname === "/members" ||
+                      pathname === "/members/new" ||
+                      pathname.startsWith("/members/")
+                    }
+                  >
+                    Parish registry
+                  </NavLink>
+                  <NavLink
+                    href="/users"
+                    active={pathname === "/users" || pathname.startsWith("/users/")}
+                  >
+                    App users
+                  </NavLink>
+                </>
               ) : null}
               <button
                 type="button"

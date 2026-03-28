@@ -94,7 +94,7 @@ async def test_admin_can_create_attendance(
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["status"] == "present"
-    assert body["church_member_id"] == member["user"]["member_id"]
+    assert body["user_id"] == member["user"]["id"]
     assert body["linked_user_id"] == member["user"]["id"]
 
 
@@ -117,7 +117,7 @@ async def test_admin_can_update_attendance(
     assert create.status_code == 201
 
     patch = await client.patch(
-        f"/api/v1/events/{event['event_id']}/attendance/{member['user']['member_id']}",
+        f"/api/v1/events/{event['event_id']}/attendance/{member['user']['id']}",
         headers={"Authorization": f"Bearer {admin_tok}"},
         json={"status": "excused"},
     )
@@ -190,7 +190,7 @@ async def test_non_admin_cannot_create_or_update_attendance(
     assert create.status_code == 403
 
     patch = await client.patch(
-        f"/api/v1/events/{event['event_id']}/attendance/{reg['user']['member_id']}",
+        f"/api/v1/events/{event['event_id']}/attendance/{reg['user']['id']}",
         headers={"Authorization": f"Bearer {member_tok}"},
         json={"status": "absent"},
     )

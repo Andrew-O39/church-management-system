@@ -218,10 +218,13 @@ export type AttendanceStatus = "present" | "absent" | "excused";
 export type AttendanceRow = {
   id: string;
   event_id: string;
-  church_member_id: string;
+  user_id: string;
   member_full_name: string;
   member_email: string | null;
+  contact_email: string | null;
   linked_user_id: string | null;
+  user_full_name: string | null;
+  user_email: string | null;
   status: AttendanceStatus;
   recorded_by_user_id: string;
   created_at: string;
@@ -235,7 +238,6 @@ export type EventAttendanceListResponse = {
 export type MyAttendanceResponse = {
   event_id: string;
   user_id: string;
-  church_member_id: string | null;
   status: AttendanceStatus | null;
   recorded: boolean;
 };
@@ -261,12 +263,11 @@ export type VolunteerRoleListResponse = {
 export type VolunteerAssignmentRow = {
   id: string;
   event_id: string;
-  church_member_id: string;
+  user_id: string;
   member_full_name: string;
   member_email: string | null;
   linked_user_id: string | null;
   linked_user_email: string | null;
-  user_id: string | null;
   user_full_name: string;
   user_email: string;
   role_id: string;
@@ -277,7 +278,149 @@ export type VolunteerAssignmentRow = {
   updated_at: string;
 };
 
-/** GET /api/v1/church-members/eligible-for-event/{eventId} */
+/** Church parish registry (GET /api/v1/church-members/…) */
+export type Gender = "male" | "female" | "other" | "unknown" | "prefer_not_to_say";
+
+export type ChurchMembershipStatus =
+  | "active"
+  | "inactive"
+  | "visitor"
+  | "transferred"
+  | "deceased";
+
+export type ChurchMemberListItem = {
+  id: string;
+  church_member_id: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  membership_status: ChurchMembershipStatus;
+  is_active: boolean;
+  is_deceased: boolean;
+  linked_user_id: string | null;
+  user_id: string | null;
+  user_full_name: string | null;
+  user_email: string | null;
+  joined_at: string;
+};
+
+export type ChurchMemberListResponse = {
+  items: ChurchMemberListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type ChurchMemberDetailResponse = {
+  id: string;
+  church_member_id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  full_name: string;
+  gender: Gender;
+  date_of_birth: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  nationality: string | null;
+  occupation: string | null;
+  marital_status: MaritalStatus | null;
+  preferred_language: string | null;
+  registration_number: string | null;
+  membership_status: ChurchMembershipStatus;
+  joined_at: string;
+  is_active: boolean;
+  is_baptized: boolean;
+  baptism_date: string | null;
+  baptism_place: string | null;
+  is_communicant: boolean;
+  first_communion_date: string | null;
+  first_communion_place: string | null;
+  is_confirmed: boolean;
+  confirmation_date: string | null;
+  confirmation_place: string | null;
+  is_married: boolean;
+  marriage_date: string | null;
+  marriage_place: string | null;
+  spouse_name: string | null;
+  father_name: string | null;
+  mother_name: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  is_deceased: boolean;
+  date_of_death: string | null;
+  funeral_date: string | null;
+  burial_place: string | null;
+  cause_of_death: string | null;
+  notes: string | null;
+  linked_user_id: string | null;
+  user_id: string | null;
+  user_full_name: string | null;
+  user_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChurchMemberStatsResponse = {
+  total_members: number;
+  active_members: number;
+  deceased_members: number;
+  gender_distribution: Record<string, number>;
+  age_groups: Record<string, number>;
+  members_with_accounts: number;
+  members_without_accounts: number;
+};
+
+/** POST /api/v1/church-members/ — body matches backend ChurchMemberCreate */
+export type ChurchMemberCreateBody = {
+  first_name: string;
+  last_name: string;
+  middle_name?: string | null;
+  gender?: Gender;
+  date_of_birth?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  nationality?: string | null;
+  occupation?: string | null;
+  marital_status?: MaritalStatus | null;
+  preferred_language?: string | null;
+  registration_number?: string | null;
+  membership_status?: ChurchMembershipStatus;
+  is_active?: boolean;
+  joined_at?: string | null;
+  is_baptized?: boolean;
+  baptism_date?: string | null;
+  baptism_place?: string | null;
+  is_communicant?: boolean;
+  first_communion_date?: string | null;
+  first_communion_place?: string | null;
+  is_confirmed?: boolean;
+  confirmation_date?: string | null;
+  confirmation_place?: string | null;
+  is_married?: boolean;
+  marriage_date?: string | null;
+  marriage_place?: string | null;
+  spouse_name?: string | null;
+  father_name?: string | null;
+  mother_name?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  is_deceased?: boolean;
+  date_of_death?: string | null;
+  funeral_date?: string | null;
+  burial_place?: string | null;
+  cause_of_death?: string | null;
+  notes?: string | null;
+};
+
+/** PATCH /api/v1/church-members/{id} */
+export type ChurchMemberPatchBody = Partial<ChurchMemberCreateBody>;
+
+/** GET /api/v1/church-members/eligible-for-event/{eventId} — each row is an app user; `id` is user id. */
 export type EligibleChurchMemberListItem = {
   id: string;
   full_name: string;

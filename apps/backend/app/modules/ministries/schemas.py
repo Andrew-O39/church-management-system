@@ -25,11 +25,10 @@ class MinistryMemberRow(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     membership_id: uuid.UUID
-    church_member_id: uuid.UUID
+    user_id: uuid.UUID
     full_name: str
     email: str | None
     linked_user_id: uuid.UUID | None
-    user_id: uuid.UUID | None
     user_full_name: str | None
     user_email: str | None
     role_in_ministry: MinistryRoleInMinistry
@@ -63,22 +62,17 @@ class MinistryPatch(BaseModel):
 
 
 class MinistryMembershipCreate(BaseModel):
-    """Identify the parishioner via registry id, app user id, or email."""
+    """Identify the app user by id or email."""
 
-    church_member_id: uuid.UUID | None = None
     user_id: uuid.UUID | None = None
     email: EmailStr | None = None
     role_in_ministry: MinistryRoleInMinistry = MinistryRoleInMinistry.MEMBER
 
     @model_validator(mode="after")
     def require_one_pointer(self) -> MinistryMembershipCreate:
-        n = sum(
-            1
-            for x in (self.church_member_id, self.user_id, self.email)
-            if x is not None
-        )
+        n = sum(1 for x in (self.user_id, self.email) if x is not None)
         if n != 1:
-            raise ValueError("Provide exactly one of church_member_id, user_id, or email")
+            raise ValueError("Provide exactly one of user_id or email")
         return self
 
 

@@ -70,7 +70,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const [detail, setDetail] = useState<EventDetailResponse | EventMemberViewResponse | null>(null);
 
   const [ministries, setMinistries] = useState<MinistryListResponse["items"]>([]);
-  const [attendanceByChurchMemberId, setAttendanceByChurchMemberId] = useState<Record<string, AttendanceStatus>>({});
+  const [attendanceByUserId, setAttendanceByUserId] = useState<Record<string, AttendanceStatus>>({});
   const [attendanceRowPhase, setAttendanceRowPhase] = useState<Record<string, "idle" | "saving" | "success" | "error">>(
     {},
   );
@@ -80,7 +80,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
 
   const [volunteerAssignments, setVolunteerAssignments] = useState<VolunteerAssignmentRow[]>([]);
   const [volunteerRolesForEvent, setVolunteerRolesForEvent] = useState<VolunteerRoleListResponse["items"]>([]);
-  const [volNewChurchMemberId, setVolNewChurchMemberId] = useState("");
+  const [volNewUserId, setVolNewUserId] = useState("");
   const [volNewRoleId, setVolNewRoleId] = useState("");
   const [volNewNotes, setVolNewNotes] = useState("");
   const [volAssigning, setVolAssigning] = useState(false);
@@ -146,11 +146,11 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           `/api/v1/events/${eventId}/attendance`,
           { method: "GET", token },
         );
-        const byMember: Record<string, AttendanceStatus> = {};
+        const byUser: Record<string, AttendanceStatus> = {};
         attendance.items.forEach((a) => {
-          byMember[a.church_member_id] = a.status;
+          byUser[a.user_id] = a.status;
         });
-        setAttendanceByChurchMemberId(byMember);
+        setAttendanceByUserId(byUser);
 
         const eligible = await apiFetch<EligibleChurchMemberListItem[]>(
           `/api/v1/church-members/eligible-for-event/${encodeURIComponent(eventId)}`,
@@ -256,26 +256,26 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
     }
   }
 
-  async function onAttendanceStatusChange(churchMemberId: string, raw: string) {
+  async function onAttendanceStatusChange(userId: string, raw: string) {
     if (!token || !isAdmin || !detail || !("event_id" in detail) || !detail.is_active) return;
     if (!raw) return;
     const nextStatus = raw as AttendanceStatus;
     if (!ATTENDANCE_OPTIONS.includes(nextStatus)) return;
 
-    const hadRecord = Boolean(attendanceByChurchMemberId[churchMemberId]);
-    const previousStatus = attendanceByChurchMemberId[churchMemberId];
+    const hadRecord = Boolean(attendanceByUserId[userId]);
+    const previousStatus = attendanceByUserId[userId];
 
-    setAttendanceByChurchMemberId((prev) => ({ ...prev, [churchMemberId]: nextStatus }));
-    setAttendanceRowPhase((prev) => ({ ...prev, [churchMemberId]: "saving" }));
+    setAttendanceByUserId((prev) => ({ ...prev, [userId]: nextStatus }));
+    setAttendanceRowPhase((prev) => ({ ...prev, [userId]: "saving" }));
     setAttendanceRowError((prev) => {
       const next = { ...prev };
-      delete next[churchMemberId];
+      delete next[userId];
       return next;
     });
 
     try {
       if (hadRecord) {
-        await apiFetch(`/api/v1/events/${eventId}/attendance/${churchMemberId}`, {
+        await apiFetch(`/api/v1/events/${eventId}/attendance/${userId}`, {
           method: "PATCH",
           token,
           body: { status: nextStatus },
@@ -284,24 +284,24 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         await apiFetch(`/api/v1/events/${eventId}/attendance`, {
           method: "POST",
           token,
-          body: { church_member_id: churchMemberId, status: nextStatus },
+          body: { user_id: userId, status: nextStatus },
         });
       }
-      setAttendanceRowPhase((prev) => ({ ...prev, [churchMemberId]: "success" }));
+      setAttendanceRowPhase((prev) => ({ ...prev, [userId]: "success" }));
       window.setTimeout(() => {
         setAttendanceRowPhase((prev) =>
-          prev[churchMemberId] === "success" ? { ...prev, [churchMemberId]: "idle" } : prev,
+          prev[userId] === "success" ? { ...prev, [userId]: "idle" } : prev,
         );
       }, 2000);
     } catch (err) {
-      setAttendanceByChurchMemberId((prev) => {
+      setAttendanceByUserId((prev) => {
         const next = { ...prev };
-        if (previousStatus === undefined) delete next[churchMemberId];
-        else next[churchMemberId] = previousStatus;
+        if (previousStatus === undefined) delete next[userId];
+        else next[userId] = previousStatus;
         return next;
       });
-      setAttendanceRowPhase((prev) => ({ ...prev, [churchMemberId]: "error" }));
-      setAttendanceRowError((prev) => ({ ...prev, [churchMemberId]: toErrorMessage(err) }));
+      setAttendanceRowPhase((prev) => ({ ...prev, [userId]: "error" }));
+      setAttendanceRowError((prev) => ({ ...prev, [userId]: toErrorMessage(err) }));
     }
   }
 
@@ -317,8 +317,8 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   async function onAssignVolunteer(e: FormEvent) {
     e.preventDefault();
     if (!token || !isAdmin || !detail || !("event_id" in detail) || !detail.is_active) return;
-    if (!volNewChurchMemberId || !volNewRoleId) {
-      setVolunteerSectionError("Choose a member and a volunteer role.");
+    if (!volNewUserId || !volNewRoleId) {
+      setVolunteerSectionError("Choose a user and a volunteer role.");
       return;
     }
     setVolAssigning(true);
@@ -328,12 +328,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         method: "POST",
         token,
         body: {
-          church_member_id: volNewChurchMemberId,
+          user_id: volNewUserId,
           role_id: volNewRoleId,
           notes: volNewNotes.trim() || null,
         },
       });
-      setVolNewChurchMemberId("");
+      setVolNewUserId("");
       setVolNewRoleId("");
       setVolNewNotes("");
       const vlist = await apiFetch<EventVolunteerListResponse>(`/api/v1/events/${eventId}/volunteers`, {
@@ -582,7 +582,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               </p>
             ) : null}
             {eligibleChurchMembers.length === 0 ? (
-              <p className="text-sm text-slate-600">No eligible church members for this event.</p>
+              <p className="text-sm text-slate-600">No eligible app users for this event.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
@@ -595,7 +595,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {eligibleChurchMembers.map((u) => {
-                      const persisted = attendanceByChurchMemberId[u.id];
+                      const persisted = attendanceByUserId[u.id];
                       const selectValue = persisted ?? "";
                       const phase = attendanceRowPhase[u.id] ?? "idle";
                       const rowErr = attendanceRowError[u.id];
@@ -658,17 +658,17 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Add assignment</p>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">Member</label>
+                  <label className="text-xs font-medium text-slate-700">App user</label>
                   <select
-                    value={volNewChurchMemberId}
+                    value={volNewUserId}
                     onChange={(e) => {
-                      setVolNewChurchMemberId(e.target.value);
+                      setVolNewUserId(e.target.value);
                       setVolunteerSectionError(null);
                     }}
                     className={inputCls}
                     disabled={!detail.is_active}
                   >
-                    <option value="">Select member</option>
+                    <option value="">Select user</option>
                     {eligibleChurchMembers.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.full_name}
@@ -713,7 +713,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               </div>
               <button
                 type="submit"
-                disabled={!detail.is_active || volAssigning || !volNewChurchMemberId || !volNewRoleId}
+                disabled={!detail.is_active || volAssigning || !volNewUserId || !volNewRoleId}
                 className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
               >
                 {volAssigning ? "Assigning…" : "Assign volunteer"}

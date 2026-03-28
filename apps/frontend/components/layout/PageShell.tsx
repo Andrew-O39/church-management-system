@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 type PageShellProps = {
   title: string;
-  description?: string;
+  description?: ReactNode;
   children: ReactNode;
 };
 
@@ -12,7 +12,7 @@ export default function PageShell({ title, description, children }: PageShellPro
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
         {description ? (
-          <p className="max-w-2xl text-sm text-slate-600">{description}</p>
+          <div className="max-w-2xl text-sm text-slate-600">{description}</div>
         ) : null}
       </header>
       {children}

@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+# Parish registry: official church records (admin). Product domain separate from generic app users.
+
 import re
 import uuid
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.db.models.church_event import ChurchEvent
 from app.db.models.church_member import ChurchMember
-from app.db.models.enums import ChurchMembershipStatus, Gender
+from app.db.models.enums import ChurchMembershipStatus
 from app.db.models.ministry_membership import MinistryMembership
 from app.db.models.user import User
 from app.modules.auth import service as auth_service
@@ -37,51 +39,6 @@ def build_full_name(*, first_name: str, middle_name: str | None, last_name: str)
         parts.append(middle_name.strip())
     parts.append(last_name.strip())
     return " ".join(parts)
-
-
-def split_full_name_to_parts(full_name: str) -> tuple[str, str | None, str]:
-    parts = full_name.strip().split()
-    if not parts:
-        return "Member", None, "Unknown"
-    if len(parts) == 1:
-        return parts[0], None, parts[0]
-    if len(parts) == 2:
-        return parts[0], None, parts[1]
-    return parts[0], " ".join(parts[1:-1]), parts[-1]
-
-
-async def create_member_for_registered_user(session: AsyncSession, user: User) -> ChurchMember:
-    """Create a registry row for a newly registered app user and attach profile hints."""
-    await session.refresh(user, attribute_names=["member_profile"])
-    first, middle, last = split_full_name_to_parts(user.full_name)
-    profile = user.member_profile
-    built_full = build_full_name(first_name=first, middle_name=middle, last_name=last)
-    await _ensure_no_duplicate_name_and_dob(
-        session,
-        full_name=built_full,
-        date_of_birth=profile.date_of_birth if profile else None,
-    )
-    cm = ChurchMember(
-        first_name=first,
-        middle_name=middle,
-        last_name=last,
-        full_name=built_full,
-        gender=Gender.UNKNOWN,
-        phone=profile.phone_number if profile else None,
-        date_of_birth=profile.date_of_birth if profile else None,
-        marital_status=profile.marital_status if profile else None,
-        email=None,
-        membership_status=ChurchMembershipStatus.ACTIVE,
-        is_active=True,
-        is_baptized=bool(profile and profile.baptism_date),
-        baptism_date=profile.baptism_date if profile else None,
-        is_confirmed=bool(profile and profile.confirmation_date),
-        confirmation_date=profile.confirmation_date if profile else None,
-        joined_at=datetime.now(timezone.utc),
-    )
-    session.add(cm)
-    await session.flush()
-    return cm
 
 
 def _to_list_item(cm: ChurchMember) -> ChurchMemberListItem:
@@ -222,7 +179,7 @@ def _church_member_filter_exprs(
     is_active: bool | None,
     is_deceased: bool | None,
 ) -> list:
-    exprs: list = []
+    exprs: list = [ChurchMember.is_parish_office_record.is_(True)]
     if search and search.strip():
         term = f"%{search.strip()}%"
         exprs.append(
@@ -288,6 +245,7 @@ async def create_church_member(session: AsyncSession, body: ChurchMemberCreate) 
         date_of_birth=body.date_of_birth,
     )
     cm = ChurchMember(
+        is_parish_office_record=True,
         first_name=fn,
         middle_name=mn,
         last_name=ln,
@@ -404,6 +362,7 @@ async def link_user_to_member(
                 detail="Another user is already linked to this church member",
             )
     u.member_id = cm.id
+    cm.is_parish_office_record = True
     await session.commit()
     await session.refresh(u)
     stmt = (
@@ -442,8 +401,13 @@ def _age_bucket(dob: date | None) -> str:
 
 
 async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsResponse:
+    parish_only = ChurchMember.is_parish_office_record.is_(True)
     total = int(
-        (await session.execute(select(func.count()).select_from(ChurchMember))).scalar_one()
+        (
+            await session.execute(
+                select(func.count()).select_from(ChurchMember).where(parish_only),
+            )
+        ).scalar_one()
     )
     active_members = int(
         (
@@ -451,6 +415,7 @@ async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsRespons
                 select(func.count())
                 .select_from(ChurchMember)
                 .where(
+                    parish_only,
                     ChurchMember.is_active.is_(True),
                     ChurchMember.is_deceased.is_(False),
                 ),
@@ -460,24 +425,31 @@ async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsRespons
     deceased_members = int(
         (
             await session.execute(
-                select(func.count()).select_from(ChurchMember).where(ChurchMember.is_deceased.is_(True)),
+                select(func.count())
+                .select_from(ChurchMember)
+                .where(parish_only, ChurchMember.is_deceased.is_(True)),
             )
         ).scalar_one()
     )
     with_accounts = int(
         (
             await session.execute(
-                select(func.count()).select_from(ChurchMember).join(User, User.member_id == ChurchMember.id),
+                select(func.count())
+                .select_from(ChurchMember)
+                .where(parish_only)
+                .join(User, User.member_id == ChurchMember.id),
             )
         ).scalar_one()
     )
 
     gender_q = await session.execute(
-        select(ChurchMember.gender, func.count()).group_by(ChurchMember.gender),
+        select(ChurchMember.gender, func.count())
+        .where(parish_only)
+        .group_by(ChurchMember.gender),
     )
     gender_distribution = {g.value: int(c) for g, c in gender_q.all()}
 
-    dob_rows = (await session.execute(select(ChurchMember.date_of_birth))).all()
+    dob_rows = (await session.execute(select(ChurchMember.date_of_birth).where(parish_only))).all()
     age_groups: dict[str, int] = {"child": 0, "youth": 0, "adult": 0, "senior": 0, "unknown": 0}
     for (dob,) in dob_rows:
         age_groups[_age_bucket(dob)] += 1
@@ -493,84 +465,43 @@ async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsRespons
     )
 
 
-async def _is_active_ministry_member_of_church_member(
-    session: AsyncSession,
-    *,
-    church_member_id: uuid.UUID,
-    ministry_id: uuid.UUID,
-) -> bool:
-    q = (
-        select(1)
-        .select_from(MinistryMembership)
-        .where(
-            MinistryMembership.church_member_id == church_member_id,
-            MinistryMembership.ministry_id == ministry_id,
-            MinistryMembership.is_active.is_(True),
-        )
-        .exists()
-    )
-    return bool((await session.execute(select(q))).scalar_one())
-
-
-async def is_church_member_eligible_for_event(
-    session: AsyncSession,
-    *,
-    event: ChurchEvent,
-    cm: ChurchMember,
-) -> bool:
-    if cm.is_deceased or cm.membership_status in (
-        ChurchMembershipStatus.DECEASED,
-        ChurchMembershipStatus.TRANSFERRED,
-    ):
-        return False
-    if not cm.is_active or cm.membership_status not in (
-        ChurchMembershipStatus.ACTIVE,
-        ChurchMembershipStatus.VISITOR,
-    ):
-        return False
-    if event.ministry_id is None:
-        return True
-    return await _is_active_ministry_member_of_church_member(
-        session,
-        church_member_id=cm.id,
-        ministry_id=event.ministry_id,
-    )
-
-
 async def list_eligible_church_members_for_event(
     session: AsyncSession,
     *,
     event: ChurchEvent,
 ) -> list[EligibleChurchMemberListItem]:
-    stmt: Select[tuple[ChurchMember]] = select(ChurchMember).where(
-        ChurchMember.is_active.is_(True),
-        ChurchMember.is_deceased.is_(False),
-        ChurchMember.membership_status.in_(
-            [ChurchMembershipStatus.ACTIVE, ChurchMembershipStatus.VISITOR],
-        ),
-    )
-    if event.ministry_id is not None:
-        mm_exists = (
-            select(1)
-            .select_from(MinistryMembership)
+    """App users eligible for attendance/volunteers: active users in the event ministry (or all active users if church-wide)."""
+    if event.ministry_id is None:
+        stmt = (
+            select(User)
+            .where(User.is_active.is_(True))
+            .options(selectinload(User.member_profile))
+            .order_by(User.full_name.asc())
+        )
+    else:
+        stmt = (
+            select(User)
+            .join(MinistryMembership, MinistryMembership.user_id == User.id)
             .where(
-                MinistryMembership.church_member_id == ChurchMember.id,
                 MinistryMembership.ministry_id == event.ministry_id,
                 MinistryMembership.is_active.is_(True),
+                User.is_active.is_(True),
             )
-            .exists()
+            .options(selectinload(User.member_profile))
+            .order_by(User.full_name.asc())
         )
-        stmt = stmt.where(mm_exists)
-    stmt = stmt.order_by(ChurchMember.full_name.asc()).options(
-        joinedload(ChurchMember.linked_user),
-    )
     rows = list((await session.execute(stmt)).unique().scalars().all())
-    return [
-        EligibleChurchMemberListItem(
-            id=r.id,
-            full_name=r.full_name,
-            email=contact_email(church_member=r, linked_user=r.linked_user),
-            phone=r.phone,
+    out: list[EligibleChurchMemberListItem] = []
+    for u in rows:
+        prof = u.member_profile
+        phone = prof.phone_number if prof else None
+        em = prof.contact_email if prof and prof.contact_email else u.email
+        out.append(
+            EligibleChurchMemberListItem(
+                id=u.id,
+                full_name=u.full_name,
+                email=em,
+                phone=phone,
+            ),
         )
-        for r in rows
-    ]
+    return out

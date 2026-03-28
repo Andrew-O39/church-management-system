@@ -8,6 +8,8 @@ function isProtectedPath(pathname: string) {
     pathname === "/profile" ||
     pathname === "/members" ||
     pathname.startsWith("/members/") ||
+    pathname === "/users" ||
+    pathname.startsWith("/users/") ||
     pathname === "/events" ||
     pathname.startsWith("/events/") ||
     pathname === "/ministries" ||
@@ -39,6 +41,7 @@ export const config = {
   matcher: [
     "/profile/:path*",
     "/members/:path*",
+    "/users/:path*",
     "/events/:path*",
     "/ministries/:path*",
     "/volunteers",

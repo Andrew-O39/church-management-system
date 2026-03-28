@@ -1,43 +1,44 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useAuth } from "components/providers/AuthProvider";
 import { apiFetch } from "lib/api";
-import type { MemberDetailResponse, PreferredChannel } from "lib/types";
 import { getAccessToken } from "lib/session";
-import type { MemberSelfPatch } from "lib/types";
 import { clearSessionAndRedirect } from "lib/auth";
 import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
+import type { MemberAdminPatch, MemberDetailResponse, PreferredChannel, UserRole } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+
+const inputCls =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
 
 function optString(v: string) {
   const s = v.trim();
   return s === "" ? null : s;
 }
 
-function AdminDirectoryNotice() {
-  const params = useSearchParams();
-  if (params.get("notice") !== "admin_only") return null;
-  return (
-    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-      Parish registry and app user management are limited to administrators. You can still update your profile below.
-    </div>
-  );
+function formatRole(role: string) {
+  return role.split("_").join(" ");
 }
 
-function ProfilePageContent() {
+export default function AppUserDetailPage({ params }: { params: { id: string } }) {
+  const userId = params.id;
   const router = useRouter();
   const token = getAccessToken();
+  const { user, status, isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [data, setData] = useState<MemberDetailResponse | null>(null);
-
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [role, setRole] = useState<UserRole>("member");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [address, setAddress] = useState("");
@@ -46,19 +47,33 @@ function ProfilePageContent() {
   const [preferredChannel, setPreferredChannel] = useState<PreferredChannel>("whatsapp");
 
   useEffect(() => {
-    if (!token) {
-      setError("You need to sign in to view this page.");
+    if (status === "authenticated" && user && !isAdmin) {
+      router.replace("/profile?notice=admin_only");
+    }
+  }, [status, user, isAdmin, router]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!token || status !== "authenticated" || !isAdmin) {
       setLoading(false);
       return;
     }
 
-    apiFetch<MemberDetailResponse>("/api/v1/members/me/profile", {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    apiFetch<MemberDetailResponse>(`/api/v1/members/${encodeURIComponent(userId)}`, {
       method: "GET",
       token,
     })
       .then((res) => {
+        if (cancelled) return;
         setData(res);
         setFullName(res.full_name);
+        setEmail(res.email);
+        setIsActive(res.is_active);
+        setRole(res.role);
         setPhoneNumber(res.profile.phone_number ?? "");
         setContactEmail(res.profile.contact_email ?? "");
         setAddress(res.profile.address ?? "");
@@ -67,6 +82,7 @@ function ProfilePageContent() {
         setPreferredChannel(res.profile.preferred_channel);
       })
       .catch((err) => {
+        if (cancelled) return;
         if (isUnauthorized(err)) {
           clearSessionAndRedirect(router, "session_expired");
           return;
@@ -76,21 +92,34 @@ function ProfilePageContent() {
           return;
         }
         setError(toErrorMessage(err));
+        setData(null);
       })
-      .finally(() => setLoading(false));
-  }, [router, token]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  const canSubmit = useMemo(() => !submitting && fullName.trim().length > 0, [fullName, submitting]);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, status, userId, isAdmin, router]);
+
+  const canSubmit = useMemo(
+    () => !submitting && fullName.trim().length > 0 && email.trim().length > 0,
+    [fullName, email, submitting],
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !canSubmit) return;
     setSubmitting(true);
     setError(null);
     setSuccess(false);
 
-    const payload: MemberSelfPatch = {
+    const patch: MemberAdminPatch = {
       full_name: fullName.trim(),
+      email: email.trim(),
+      is_active: isActive,
+      role,
       phone_number: optString(phoneNumber),
       contact_email: optString(contactEmail),
       address: optString(address),
@@ -101,8 +130,8 @@ function ProfilePageContent() {
 
     try {
       const updated = await apiFetch<MemberDetailResponse>(
-        "/api/v1/members/me/profile",
-        { method: "PATCH", body: payload, token },
+        `/api/v1/members/${encodeURIComponent(userId)}`,
+        { method: "PATCH", body: patch, token },
       );
       setData(updated);
       setSuccess(true);
@@ -123,17 +152,26 @@ function ProfilePageContent() {
 
   return (
     <PageShell
-      title="Your profile"
-      description="Update your app profile and contact preferences. Official parish sacramental records are maintained separately by parish staff."
+      title="App user"
+      description={
+        <>
+          <Link href="/users" className="text-slate-600 underline-offset-2 hover:underline">
+            ← App users
+          </Link>
+          <span className="text-slate-400"> · </span>
+          <span className="text-slate-600">
+            Manage login account and app profile. Parish sacramental records live under{" "}
+            <Link href="/members" className="font-medium text-slate-900 underline-offset-2 hover:underline">
+              Parish registry
+            </Link>
+            .
+          </span>
+        </>
+      }
     >
-      <AdminDirectoryNotice />
-
       {loading ? (
         <ContentCard>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-            Loading your profile…
-          </div>
+          <p className="text-sm text-slate-600">Loading…</p>
         </ContentCard>
       ) : null}
 
@@ -147,10 +185,9 @@ function ProfilePageContent() {
         <ContentCard>
           {success ? (
             <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-              Your changes were saved.
+              Changes saved.
             </div>
           ) : null}
-
           {error ? (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
               {error}
@@ -160,67 +197,68 @@ function ProfilePageContent() {
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
-                <label htmlFor="pf-name" className="text-sm font-medium text-slate-800">
-                  Full name
-                </label>
+                <label className="text-sm font-medium text-slate-800">Full name</label>
                 <input
-                  id="pf-name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={inputCls}
+                  required
                 />
               </div>
-
               <div className="space-y-1.5">
-                <label htmlFor="pf-login-email" className="text-sm font-medium text-slate-800">
-                  Login email
-                </label>
+                <label className="text-sm font-medium text-slate-800">Login email</label>
                 <input
-                  id="pf-login-email"
-                  value={data.email}
-                  disabled
-                  className="w-full cursor-not-allowed rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputCls}
+                  required
                 />
-                <p className="text-xs text-slate-500">
-                  To change your login email, ask an administrator.
-                </p>
               </div>
-
               <div className="space-y-1.5">
-                <label htmlFor="pf-phone" className="text-sm font-medium text-slate-800">
-                  Phone number
+                <label className="text-sm font-medium text-slate-800">Role</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className={inputCls}
+                >
+                  <option value="member">Member</option>
+                  <option value="group_leader">Group leader</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-800">Account status</label>
+                <label className="flex items-center gap-2 text-sm text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  Active (can sign in)
                 </label>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-800">Phone</label>
                 <input
-                  id="pf-phone"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={inputCls}
                 />
               </div>
-
               <div className="space-y-1.5">
-                <label htmlFor="pf-contact-email" className="text-sm font-medium text-slate-800">
-                  Directory contact email{" "}
-                  <span className="font-normal text-slate-500">(optional)</span>
-                </label>
+                <label className="text-sm font-medium text-slate-800">Contact email (optional)</label>
                 <input
-                  id="pf-contact-email"
+                  type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  type="email"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={inputCls}
                 />
-                <p className="text-xs text-slate-500">
-                  Optional contact email for ministries and events if different from your login email.
-                </p>
               </div>
-
               <div className="space-y-1.5 md:col-span-2">
-                <label htmlFor="pf-address" className="text-sm font-medium text-slate-800">
-                  Address
-                </label>
+                <label className="text-sm font-medium text-slate-800">Address</label>
                 <textarea
-                  id="pf-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="h-24 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
@@ -231,37 +269,30 @@ function ProfilePageContent() {
             <div className="border-t border-slate-100 pt-6">
               <h2 className="mb-3 text-sm font-semibold text-slate-900">Notifications</h2>
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2 md:col-span-2">
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={whatsappEnabled}
-                      onChange={(e) => setWhatsappEnabled(e.target.checked)}
-                      className="rounded border-slate-300"
-                    />
-                    <span className="text-sm text-slate-800">WhatsApp</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={smsEnabled}
-                      onChange={(e) => setSmsEnabled(e.target.checked)}
-                      className="rounded border-slate-300"
-                    />
-                    <span className="text-sm text-slate-800">SMS</span>
-                  </label>
-                </div>
-
+                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={whatsappEnabled}
+                    onChange={(e) => setWhatsappEnabled(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-sm text-slate-800">WhatsApp</span>
+                </label>
+                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={smsEnabled}
+                    onChange={(e) => setSmsEnabled(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-sm text-slate-800">SMS</span>
+                </label>
                 <div className="space-y-1.5">
-                  <label htmlFor="pf-channel" className="text-sm font-medium text-slate-800">
-                    Preferred channel
-                  </label>
+                  <label className="text-sm font-medium text-slate-800">Preferred channel</label>
                   <select
-                    id="pf-channel"
                     value={preferredChannel}
                     onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                    className={inputCls}
                   >
                     <option value="whatsapp">WhatsApp</option>
                     <option value="sms">SMS</option>
@@ -279,29 +310,13 @@ function ProfilePageContent() {
               >
                 {submitting ? "Saving…" : "Save changes"}
               </button>
+              <span className="text-xs text-slate-500">
+                App role: <span className="font-medium text-slate-700">{formatRole(data.role)}</span>
+              </span>
             </div>
           </form>
         </ContentCard>
       ) : null}
     </PageShell>
-  );
-}
-
-export default function ProfilePage() {
-  return (
-    <Suspense
-      fallback={
-        <PageShell
-          title="Your profile"
-          description="Update your app profile and contact preferences. Official parish sacramental records are maintained separately by parish staff."
-        >
-          <ContentCard>
-            <p className="text-sm text-slate-600">Loading…</p>
-          </ContentCard>
-        </PageShell>
-      }
-    >
-      <ProfilePageContent />
-    </Suspense>
   );
 }

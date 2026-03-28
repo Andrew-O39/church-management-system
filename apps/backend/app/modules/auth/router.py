@@ -30,6 +30,7 @@ async def register(
     body: RegisterRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> RegisterResponse:
+    """Create an application login only. Does not create parish registry (``ChurchMember``) rows."""
     email_norm = normalize_email(str(body.email))
     existing = await auth_service.get_user_by_email(session, email_norm)
     if existing is not None:

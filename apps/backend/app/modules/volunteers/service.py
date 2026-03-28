@@ -10,14 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.db.models.church_event import ChurchEvent
-from app.db.models.church_member import ChurchMember
 from app.db.models.user import User
 from app.db.models.volunteer_assignment import VolunteerAssignment
 from app.db.models.volunteer_role import VolunteerRole
 from app.modules.attendance import service as attendance_service
 from app.modules.auth import service as auth_service
-from app.modules.church_registry import service as registry_service
-from app.modules.church_registry.person_display import linked_account_fields
 from app.modules.volunteers.schemas import (
     EventVolunteerListResponse,
     MyEventVolunteerAssignmentsResponse,
@@ -254,23 +251,20 @@ async def patch_volunteer_role(
 
 
 def _to_assignment_row(va: VolunteerAssignment) -> VolunteerAssignmentRow:
-    cm = va.church_member
+    u = va.volunteer_user
     role = va.role
-    if cm is None or role is None:
-        raise RuntimeError("VolunteerAssignment missing church_member or role")
-    lu = cm.linked_user if cm.linked_user is not None else None
-    uid, ufn, uem = linked_account_fields(lu)
+    if u is None or role is None:
+        raise RuntimeError("VolunteerAssignment missing user or role")
     return VolunteerAssignmentRow(
         id=va.id,
         event_id=va.event_id,
-        church_member_id=va.church_member_id,
-        member_full_name=cm.full_name,
-        member_email=cm.email,
-        linked_user_id=uid,
-        linked_user_email=uem,
-        user_id=uid,
-        user_full_name=ufn,
-        user_email=uem,
+        user_id=u.id,
+        member_full_name=u.full_name,
+        member_email=u.email,
+        linked_user_id=u.id,
+        linked_user_email=u.email,
+        user_full_name=u.full_name,
+        user_email=u.email,
         role_id=va.role_id,
         role_name=role.name,
         notes=va.notes,
@@ -290,7 +284,7 @@ async def list_event_volunteers_admin(
         select(VolunteerAssignment)
         .where(VolunteerAssignment.event_id == event_id)
         .options(
-            selectinload(VolunteerAssignment.church_member).joinedload(ChurchMember.linked_user),
+            selectinload(VolunteerAssignment.volunteer_user).selectinload(User.member_profile),
             selectinload(VolunteerAssignment.role),
         )
     )
@@ -312,7 +306,7 @@ async def get_assignment_for_event_or_404(
             VolunteerAssignment.event_id == event_id,
         )
         .options(
-            selectinload(VolunteerAssignment.church_member).joinedload(ChurchMember.linked_user),
+            selectinload(VolunteerAssignment.volunteer_user).selectinload(User.member_profile),
             selectinload(VolunteerAssignment.role),
             selectinload(VolunteerAssignment.event),
         )
@@ -326,13 +320,10 @@ async def get_assignment_for_event_or_404(
     return va
 
 
-async def _resolve_assignment_church_member(
+async def _resolve_assignment_user(
     session: AsyncSession,
     body: VolunteerAssignmentCreate,
-) -> ChurchMember:
-    if body.church_member_id is not None:
-        return await registry_service.get_church_member_or_404(session, body.church_member_id)
-    assert body.user_id is not None
+) -> User:
     target = await auth_service.get_user_by_id(session, body.user_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -341,12 +332,7 @@ async def _resolve_assignment_church_member(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive users cannot be assigned",
         )
-    if target.member_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is not linked to a church member record",
-        )
-    return await registry_service.get_church_member_or_404(session, target.member_id)
+    return target
 
 
 async def create_volunteer_assignment(
@@ -363,12 +349,12 @@ async def create_volunteer_assignment(
             detail="Cannot add volunteer assignments to an inactive event",
         )
 
-    cm = await _resolve_assignment_church_member(session, body)
+    u = await _resolve_assignment_user(session, body)
 
-    if not await registry_service.is_church_member_eligible_for_event(session, event=event, cm=cm):
+    if not await attendance_service.is_user_eligible_for_event_attendance(session, event=event, subject=u):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Church member is not eligible for volunteer assignments on this event",
+            detail="User is not eligible for volunteer assignments on this event",
         )
 
     role = await get_volunteer_role_or_404(session, body.role_id)
@@ -376,7 +362,7 @@ async def create_volunteer_assignment(
 
     va = VolunteerAssignment(
         event_id=event_id,
-        church_member_id=cm.id,
+        user_id=u.id,
         role_id=body.role_id,
         notes=body.notes,
         assigned_by_user_id=admin_user_id,
@@ -388,7 +374,7 @@ async def create_volunteer_assignment(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This church member is already assigned to this role for this event",
+            detail="This user is already assigned to this role for this event",
         ) from None
 
     await session.refresh(va)
@@ -396,7 +382,7 @@ async def create_volunteer_assignment(
         select(VolunteerAssignment)
         .where(VolunteerAssignment.id == va.id)
         .options(
-            selectinload(VolunteerAssignment.church_member).joinedload(ChurchMember.linked_user),
+            selectinload(VolunteerAssignment.volunteer_user).selectinload(User.member_profile),
             selectinload(VolunteerAssignment.role),
         )
     )
@@ -440,14 +426,14 @@ async def patch_volunteer_assignment(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This church member is already assigned to this role for this event",
+            detail="This user is already assigned to this role for this event",
         ) from None
 
     stmt = (
         select(VolunteerAssignment)
         .where(VolunteerAssignment.id == va.id)
         .options(
-            selectinload(VolunteerAssignment.church_member).joinedload(ChurchMember.linked_user),
+            selectinload(VolunteerAssignment.volunteer_user).selectinload(User.member_profile),
             selectinload(VolunteerAssignment.role),
         )
     )
@@ -471,11 +457,9 @@ async def list_my_volunteer_assignments(
     *,
     user: User,
 ) -> MyVolunteerAssignmentsResponse:
-    if user.member_id is None:
-        return MyVolunteerAssignmentsResponse(items=[])
     stmt = (
         select(VolunteerAssignment)
-        .where(VolunteerAssignment.church_member_id == user.member_id)
+        .where(VolunteerAssignment.user_id == user.id)
         .options(
             selectinload(VolunteerAssignment.role),
             selectinload(VolunteerAssignment.event).selectinload(ChurchEvent.ministry),
@@ -516,17 +500,14 @@ async def list_my_event_volunteer_assignments(
     if not await attendance_service.can_user_view_event(session, event=event, user=user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    if user.member_id is None:
-        return MyEventVolunteerAssignmentsResponse(items=[])
-
     stmt = (
         select(VolunteerAssignment)
         .where(
             VolunteerAssignment.event_id == event_id,
-            VolunteerAssignment.church_member_id == user.member_id,
+            VolunteerAssignment.user_id == user.id,
         )
         .options(
-            selectinload(VolunteerAssignment.church_member).joinedload(ChurchMember.linked_user),
+            selectinload(VolunteerAssignment.volunteer_user).selectinload(User.member_profile),
             selectinload(VolunteerAssignment.role),
         )
     )

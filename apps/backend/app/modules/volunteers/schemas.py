@@ -45,12 +45,11 @@ class VolunteerRoleListResponse(BaseModel):
 class VolunteerAssignmentRow(BaseModel):
     id: uuid.UUID
     event_id: uuid.UUID
-    church_member_id: uuid.UUID
+    user_id: uuid.UUID
     member_full_name: str
     member_email: str | None
     linked_user_id: uuid.UUID | None
     linked_user_email: str | None
-    user_id: uuid.UUID | None
     user_full_name: str | None
     user_email: str | None
     role_id: uuid.UUID
@@ -62,16 +61,9 @@ class VolunteerAssignmentRow(BaseModel):
 
 
 class VolunteerAssignmentCreate(BaseModel):
-    church_member_id: uuid.UUID | None = None
-    user_id: uuid.UUID | None = None
+    user_id: uuid.UUID
     role_id: uuid.UUID
     notes: str | None = Field(default=None, max_length=10_000)
-
-    @model_validator(mode="after")
-    def exactly_one_subject(self) -> VolunteerAssignmentCreate:
-        if sum(1 for x in (self.church_member_id, self.user_id) if x is not None) != 1:
-            raise ValueError("Provide exactly one of church_member_id or user_id")
-        return self
 
 
 class VolunteerAssignmentPatch(BaseModel):

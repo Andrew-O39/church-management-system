@@ -50,10 +50,10 @@ async def create_event_attendance(
     )
 
 
-@router.patch("/{event_id}/attendance/{church_member_id}", response_model=AttendanceRow)
+@router.patch("/{event_id}/attendance/{user_id}", response_model=AttendanceRow)
 async def patch_event_attendance(
     event_id: uuid.UUID,
-    church_member_id: uuid.UUID,
+    user_id: uuid.UUID,
     body: AttendancePatchInput,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
@@ -61,7 +61,7 @@ async def patch_event_attendance(
     return await attendance_service.patch_event_attendance(
         session,
         event_id=event_id,
-        church_member_id=church_member_id,
+        user_id=user_id,
         body=body,
         admin_user_id=admin.id,
     )

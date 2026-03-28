@@ -11,7 +11,6 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.db.models.church_event import ChurchEvent
-    from app.db.models.church_member import ChurchMember
     from app.db.models.user import User
     from app.db.models.volunteer_role import VolunteerRole
 
@@ -21,9 +20,9 @@ class VolunteerAssignment(Base):
     __table_args__ = (
         UniqueConstraint(
             "event_id",
-            "church_member_id",
+            "user_id",
             "role_id",
-            name="uq_volunteer_assignment_event_member_role",
+            name="uq_volunteer_assignment_event_user_role",
         ),
     )
 
@@ -39,9 +38,9 @@ class VolunteerAssignment(Base):
         nullable=False,
         index=True,
     )
-    church_member_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("church_members.id", ondelete="CASCADE"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -83,7 +82,7 @@ class VolunteerAssignment(Base):
         foreign_keys=[assigned_by_user_id],
         lazy="selectin",
     )
-    church_member: Mapped["ChurchMember | None"] = relationship(
-        foreign_keys=[church_member_id],
+    volunteer_user: Mapped["User | None"] = relationship(
+        foreign_keys=[user_id],
         lazy="selectin",
     )

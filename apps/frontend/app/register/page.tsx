@@ -76,7 +76,7 @@ export default function RegisterPage() {
   return (
     <PageShell
       title="Create account"
-      description="Register to access your member profile. An administrator can grant additional access when needed."
+      description="Create an app login to use events, volunteering, attendance, and your profile. Official parish records are maintained separately by parish staff."
     >
       <ContentCard>
         {status === "loading" ? (

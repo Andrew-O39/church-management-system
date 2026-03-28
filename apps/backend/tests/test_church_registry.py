@@ -6,6 +6,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from sqlalchemy import func, select
+
+from app.db.models.church_member import ChurchMember
 from app.db.models.enums import UserRole
 from app.modules.auth import service as auth_service
 
@@ -99,7 +102,19 @@ async def test_link_user_to_standalone_church_member(
 
 
 @pytest.mark.asyncio
-async def test_get_my_church_member_profile(
+async def test_register_does_not_create_church_member(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    reg = await _register(client, "noregistry@example.com", "No Registry Row")
+    assert reg["user"]["member_id"] is None
+    async with session_factory() as session:
+        n = (await session.execute(select(func.count()).select_from(ChurchMember))).scalar_one()
+        assert int(n) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_my_church_member_profile_requires_registry_link(
     client: AsyncClient,
     session_factory: async_sessionmaker,
 ) -> None:
@@ -110,11 +125,7 @@ async def test_get_my_church_member_profile(
         "/api/v1/church-members/me",
         headers={"Authorization": f"Bearer {tok}"},
     )
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["church_member_id"] == reg["user"]["member_id"]
-    assert body["full_name"]
-    assert body["id"] == reg["user"]["member_id"]
+    assert r.status_code == 404, r.text
 
 
 @pytest.mark.asyncio

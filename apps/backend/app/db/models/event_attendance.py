@@ -11,13 +11,13 @@ from app.db.base import Base
 from app.db.models.enums import AttendanceStatus
 
 if TYPE_CHECKING:
-    from app.db.models.church_member import ChurchMember
+    from app.db.models.user import User
 
 
 class EventAttendance(Base):
     __tablename__ = "event_attendance"
     __table_args__ = (
-        UniqueConstraint("event_id", "church_member_id", name="uq_event_attendance_event_member"),
+        UniqueConstraint("event_id", "user_id", name="uq_event_attendance_event_user"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -31,9 +31,9 @@ class EventAttendance(Base):
         nullable=False,
         index=True,
     )
-    church_member_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("church_members.id", ondelete="CASCADE"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -62,6 +62,6 @@ class EventAttendance(Base):
         nullable=False,
     )
 
-    church_member: Mapped["ChurchMember"] = relationship(
-        foreign_keys=[church_member_id],
+    subject_user: Mapped["User"] = relationship(
+        foreign_keys=[user_id],
     )

@@ -314,35 +314,27 @@ async def list_my_visible_events(session: AsyncSession, user: User) -> list[Even
 
     # Visible to authenticated non-admins:
     # - church-wide public or internal events
-    # - ministry-linked events where linked church member has an active ministry membership
-    if user.member_id is None:
-        stmt = stmt.where(
-            ChurchEvent.ministry_id.is_(None),
-            ChurchEvent.visibility.in_([EventVisibility.PUBLIC, EventVisibility.INTERNAL]),
+    # - ministry-linked events where the user has an active ministry membership
+    membership_exists = (
+        select(1)
+        .select_from(MinistryMembership)
+        .where(
+            MinistryMembership.ministry_id == ChurchEvent.ministry_id,
+            MinistryMembership.user_id == user.id,
+            MinistryMembership.is_active.is_(True),
         )
-    else:
-        membership_exists = (
-            select(1)
-            .select_from(MinistryMembership)
-            .where(
-                MinistryMembership.ministry_id == ChurchEvent.ministry_id,
-                MinistryMembership.church_member_id == user.member_id,
-                MinistryMembership.is_active.is_(True),
-            )
-            .exists()
-        )
+        .exists()
+    )
 
-        stmt = stmt.where(
-            or_(
-                and_(
-                    ChurchEvent.ministry_id.is_(None),
-                    ChurchEvent.visibility.in_(
-                        [EventVisibility.PUBLIC, EventVisibility.INTERNAL]
-                    ),
-                ),
-                and_(ChurchEvent.ministry_id.is_not(None), membership_exists),
-            )
-        )
+    stmt = stmt.where(
+        or_(
+            and_(
+                ChurchEvent.ministry_id.is_(None),
+                ChurchEvent.visibility.in_([EventVisibility.PUBLIC, EventVisibility.INTERNAL]),
+            ),
+            and_(ChurchEvent.ministry_id.is_not(None), membership_exists),
+        ),
+    )
 
     rows = list(
         (await session.execute(stmt.order_by(ChurchEvent.start_at.asc())))
@@ -374,15 +366,13 @@ async def get_member_event_view(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
         return _event_to_member_view(event)
 
-    # Ministry-linked events are visible only when linked church member has active membership.
-    if user.member_id is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    # Ministry-linked events are visible only when the user has active ministry membership.
     membership_exists = (
         select(1)
         .select_from(MinistryMembership)
         .where(
             MinistryMembership.ministry_id == event.ministry_id,
-            MinistryMembership.church_member_id == user.member_id,
+            MinistryMembership.user_id == user.id,
             MinistryMembership.is_active.is_(True),
         )
         .exists()

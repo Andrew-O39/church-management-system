@@ -1,8 +1,7 @@
 """Display and identity helpers for ChurchMember + optional linked User.
 
-church_member_id: canonical parish person (domain, attendance, ministries, volunteers).
-user_id: login account (authentication only). Domain code should resolve User.member_id → ChurchMember
-before applying business rules.
+Parish registry rows are administrative. App identity is :class:`~app.db.models.user.User`;
+``User.member_id`` is an optional manual link to a registry row for parish-office workflows only.
 """
 
 from __future__ import annotations

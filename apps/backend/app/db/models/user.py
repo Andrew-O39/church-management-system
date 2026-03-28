@@ -14,14 +14,18 @@ if TYPE_CHECKING:
     from app.db.models.church_member import ChurchMember
     from app.db.models.member_profile import MemberProfile
     from app.db.models.ministry_group import MinistryGroup
+    from app.db.models.ministry_membership import MinistryMembership
 
 
 class User(Base):
-    """Login account (email/password). Not the parish registry.
+    """Application login account (email/password).
 
-    member_id links this account to at most one ChurchMember for self-service and roster
-    resolution. Use user_id only for auth and audit fields (e.g. recorded_by_user_id);
-    prefer church_member_id for ministries, attendance, and volunteers.
+    This is the identity people use to sign in and use the app (events, volunteering, profile).
+    It is conceptually separate from the official parish registry (``ChurchMember``): the product
+    does not require users to have a parish record or vice versa.
+
+    ``member_id`` is optional legacy linkage to a parish registry row (maintenance / optional
+    admin tooling). Operational features use ``User.id`` directly (ministries, attendance, etc.).
     """
 
     __tablename__ = "users"
@@ -74,4 +78,9 @@ class User(Base):
     led_ministries: Mapped[list["MinistryGroup"]] = relationship(
         back_populates="leader",
         foreign_keys="MinistryGroup.leader_user_id",
+    )
+    ministry_memberships: Mapped[list["MinistryMembership"]] = relationship(
+        back_populates="user",
+        foreign_keys="MinistryMembership.user_id",
+        cascade="all, delete-orphan",
     )

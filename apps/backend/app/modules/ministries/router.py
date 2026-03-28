@@ -108,46 +108,46 @@ async def add_ministry_member(
 ) -> MinistryMemberRow:
     m = await ministries_service.get_ministry_or_404(session, ministry_id)
     mm = await ministries_service.add_or_reactivate_membership(session, m, body)
-    if mm.church_member is None:
+    if mm.user is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Membership church member not loaded",
+            detail="Membership user not loaded",
         )
     return ministries_service.membership_to_row(mm)
 
 
 @router.patch(
-    "/{ministry_id}/members/{church_member_id}",
+    "/{ministry_id}/members/{user_id}",
     response_model=MinistryMemberRow,
 )
 async def patch_ministry_member(
     ministry_id: uuid.UUID,
-    church_member_id: uuid.UUID,
+    user_id: uuid.UUID,
     body: MinistryMembershipPatch,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> MinistryMemberRow:
     await ministries_service.get_ministry_or_404(session, ministry_id)
-    mm = await ministries_service.patch_membership(session, ministry_id, church_member_id, body)
-    if mm.church_member is None:
+    mm = await ministries_service.patch_membership(session, ministry_id, user_id, body)
+    if mm.user is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Membership church member not loaded",
+            detail="Membership user not loaded",
         )
     return ministries_service.membership_to_row(mm)
 
 
 @router.delete(
-    "/{ministry_id}/members/{church_member_id}",
+    "/{ministry_id}/members/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
 )
 async def remove_ministry_member(
     ministry_id: uuid.UUID,
-    church_member_id: uuid.UUID,
+    user_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> Response:
     await ministries_service.get_ministry_or_404(session, ministry_id)
-    await ministries_service.deactivate_membership(session, ministry_id, church_member_id)
+    await ministries_service.deactivate_membership(session, ministry_id, user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

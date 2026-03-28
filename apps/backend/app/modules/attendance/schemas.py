@@ -13,12 +13,11 @@ class AttendanceRow(BaseModel):
 
     id: uuid.UUID
     event_id: uuid.UUID
-    church_member_id: uuid.UUID
+    user_id: uuid.UUID
     member_full_name: str
     member_email: str | None
     contact_email: str | None
     linked_user_id: uuid.UUID | None
-    user_id: uuid.UUID | None
     user_full_name: str | None
     user_email: str | None
     status: AttendanceStatus
@@ -28,15 +27,8 @@ class AttendanceRow(BaseModel):
 
 
 class AttendanceCreateInput(BaseModel):
-    church_member_id: uuid.UUID | None = None
-    user_id: uuid.UUID | None = None
+    user_id: uuid.UUID
     status: AttendanceStatus
-
-    @model_validator(mode="after")
-    def exactly_one_subject(self) -> AttendanceCreateInput:
-        if sum(1 for x in (self.church_member_id, self.user_id) if x is not None) != 1:
-            raise ValueError("Provide exactly one of church_member_id or user_id")
-        return self
 
 
 class AttendancePatchInput(BaseModel):
@@ -50,6 +42,5 @@ class EventAttendanceListResponse(BaseModel):
 class MyAttendanceResponse(BaseModel):
     event_id: uuid.UUID
     user_id: uuid.UUID
-    church_member_id: uuid.UUID | None
     status: AttendanceStatus | None
     recorded: bool

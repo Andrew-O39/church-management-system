@@ -11,16 +11,17 @@ from app.db.base import Base
 from app.db.models.enums import ChurchMembershipStatus, Gender, MaritalStatus
 
 if TYPE_CHECKING:
-    from app.db.models.ministry_membership import MinistryMembership
     from app.db.models.user import User
 
 
 class ChurchMember(Base):
-    """Canonical parishioner record: one row per real person in the parish.
+    """Official parish registry record (sacraments, membership status, deceased, etc.).
 
-    This is NOT a login account. Use User for authentication; User.member_id optionally
-    points here. Domain logic (ministries, attendance, volunteers) keys on ChurchMember.id
-    (church_member_id), never on user_id.
+    Maintained for parish administration; it is not the same thing as an app login. People may
+    appear here without an app account, and app users are not assumed to have a matching row.
+
+    Operational modules (ministries, events, attendance, volunteers) use :class:`~app.db.models.user.User`
+    identity; registry linkage via ``User.member_id`` is optional and administrative only.
     """
 
     __tablename__ = "church_members"
@@ -30,6 +31,9 @@ class ChurchMember(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+
+    #: When True, row appears in the parish-office registry. False = legacy shadow rows from old app coupling.
+    is_parish_office_record: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     first_name: Mapped[str] = mapped_column(String(120), nullable=False)
     middle_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -117,9 +121,4 @@ class ChurchMember(Base):
         primaryjoin="ChurchMember.id == User.member_id",
         foreign_keys="User.member_id",
         uselist=False,
-    )
-    ministry_memberships: Mapped[list["MinistryMembership"]] = relationship(
-        back_populates="church_member",
-        foreign_keys="MinistryMembership.church_member_id",
-        cascade="all, delete-orphan",
     )

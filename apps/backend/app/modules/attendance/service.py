@@ -5,10 +5,9 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from app.db.models.church_event import ChurchEvent
-from app.db.models.church_member import ChurchMember
 from app.db.models.enums import EventVisibility, UserRole
 from app.db.models.event_attendance import EventAttendance
 from app.db.models.ministry_membership import MinistryMembership
@@ -21,8 +20,6 @@ from app.modules.attendance.schemas import (
     MyAttendanceResponse,
 )
 from app.modules.auth import service as auth_service
-from app.modules.church_registry import service as registry_service
-from app.modules.church_registry.person_display import contact_email, linked_account_fields
 
 
 async def get_event_or_404(session: AsyncSession, event_id: uuid.UUID) -> ChurchEvent:
@@ -38,17 +35,17 @@ async def get_event_or_404(session: AsyncSession, event_id: uuid.UUID) -> Church
     return ev
 
 
-async def _is_active_member_of_ministry_church_member(
+async def _is_active_member_of_ministry_user(
     session: AsyncSession,
     *,
-    church_member_id: uuid.UUID,
+    user_id: uuid.UUID,
     ministry_id: uuid.UUID,
 ) -> bool:
     exists_q = (
         select(1)
         .select_from(MinistryMembership)
         .where(
-            MinistryMembership.church_member_id == church_member_id,
+            MinistryMembership.user_id == user_id,
             MinistryMembership.ministry_id == ministry_id,
             MinistryMembership.is_active.is_(True),
         )
@@ -72,39 +69,43 @@ async def can_user_view_event(
     if event.ministry_id is None:
         return event.visibility in {EventVisibility.PUBLIC, EventVisibility.INTERNAL}
 
-    if user.member_id is None:
-        return False
-
-    return await _is_active_member_of_ministry_church_member(
+    return await _is_active_member_of_ministry_user(
         session,
-        church_member_id=user.member_id,
+        user_id=user.id,
         ministry_id=event.ministry_id,
     )
 
 
-async def is_church_member_eligible_for_attendance(
+async def is_user_eligible_for_event_attendance(
     session: AsyncSession,
     *,
     event: ChurchEvent,
-    cm: ChurchMember,
+    subject: User,
 ) -> bool:
-    return await registry_service.is_church_member_eligible_for_event(session, event=event, cm=cm)
+    if not subject.is_active:
+        return False
+    if event.ministry_id is None:
+        return True
+    return await _is_active_member_of_ministry_user(
+        session,
+        user_id=subject.id,
+        ministry_id=event.ministry_id,
+    )
 
 
-def _to_row(att: EventAttendance, cm: ChurchMember) -> AttendanceRow:
-    lu = cm.linked_user if cm.linked_user is not None else None
-    uid, ufn, uem = linked_account_fields(lu)
+def _to_row(att: EventAttendance, u: User) -> AttendanceRow:
+    prof = u.member_profile
+    contact = prof.contact_email if prof and prof.contact_email else None
     return AttendanceRow(
         id=att.id,
         event_id=att.event_id,
-        church_member_id=att.church_member_id,
-        member_full_name=cm.full_name,
-        member_email=cm.email,
-        contact_email=contact_email(church_member=cm, linked_user=lu),
-        linked_user_id=uid,
-        user_id=uid,
-        user_full_name=ufn,
-        user_email=uem,
+        user_id=u.id,
+        member_full_name=u.full_name,
+        member_email=u.email,
+        contact_email=contact,
+        linked_user_id=u.id,
+        user_full_name=u.full_name,
+        user_email=u.email,
         status=att.status,
         recorded_by_user_id=att.recorded_by_user_id,
         created_at=att.created_at,
@@ -123,38 +124,20 @@ async def list_event_attendance(
         select(EventAttendance)
         .where(EventAttendance.event_id == event_id)
         .options(
-            selectinload(EventAttendance.church_member).joinedload(ChurchMember.linked_user),
+            selectinload(EventAttendance.subject_user).selectinload(User.member_profile),
         )
     )
     rows = list((await session.execute(stmt)).scalars().all())
 
     out: list[AttendanceRow] = []
     for row in rows:
-        cm = row.church_member
-        if cm is None:
+        u = row.subject_user
+        if u is None:
             continue
-        out.append(_to_row(row, cm))
+        out.append(_to_row(row, u))
 
-    out.sort(key=lambda r: (r.member_full_name.lower(), str(r.church_member_id)))
+    out.sort(key=lambda r: (r.member_full_name.lower(), str(r.user_id)))
     return EventAttendanceListResponse(items=out)
-
-
-async def _resolve_create_church_member(
-    session: AsyncSession,
-    body: AttendanceCreateInput,
-) -> ChurchMember:
-    if body.church_member_id is not None:
-        return await registry_service.get_church_member_or_404(session, body.church_member_id)
-    assert body.user_id is not None
-    u = await auth_service.get_user_by_id(session, body.user_id)
-    if u is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if u.member_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is not linked to a church member record",
-        )
-    return await registry_service.get_church_member_or_404(session, u.member_id)
 
 
 async def create_event_attendance(
@@ -171,44 +154,47 @@ async def create_event_attendance(
             detail="Cannot record attendance for inactive event",
         )
 
-    cm = await _resolve_create_church_member(session, body)
+    assert body.user_id is not None
+    u = await auth_service.get_user_by_id(session, body.user_id)
+    if u is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if not await is_church_member_eligible_for_attendance(session, event=event, cm=cm):
+    if not await is_user_eligible_for_event_attendance(session, event=event, subject=u):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Church member is not eligible for attendance on this event",
+            detail="User is not eligible for attendance on this event",
         )
 
     existing_stmt = select(EventAttendance).where(
         EventAttendance.event_id == event_id,
-        EventAttendance.church_member_id == cm.id,
+        EventAttendance.user_id == u.id,
     )
     existing = (await session.execute(existing_stmt)).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Attendance already exists for this member and event; use PATCH",
+            detail="Attendance already exists for this user and event; use PATCH",
         )
 
     row = EventAttendance(
         event_id=event_id,
-        church_member_id=cm.id,
+        user_id=u.id,
         status=body.status,
         recorded_by_user_id=admin_user_id,
     )
     session.add(row)
     await session.commit()
     await session.refresh(row)
-    await session.refresh(row, attribute_names=["church_member"])
-    await session.refresh(row.church_member, attribute_names=["linked_user"])
-    return _to_row(row, row.church_member)
+    await session.refresh(row, attribute_names=["subject_user"])
+    await session.refresh(row.subject_user, attribute_names=["member_profile"])
+    return _to_row(row, row.subject_user)
 
 
 async def patch_event_attendance(
     session: AsyncSession,
     *,
     event_id: uuid.UUID,
-    church_member_id: uuid.UUID,
+    user_id: uuid.UUID,
     body: AttendancePatchInput,
     admin_user_id: uuid.UUID,
 ) -> AttendanceRow:
@@ -219,17 +205,19 @@ async def patch_event_attendance(
             detail="Cannot update attendance for inactive event",
         )
 
-    cm = await registry_service.get_church_member_or_404(session, church_member_id)
+    u = await auth_service.get_user_by_id(session, user_id)
+    if u is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if not await is_church_member_eligible_for_attendance(session, event=event, cm=cm):
+    if not await is_user_eligible_for_event_attendance(session, event=event, subject=u):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Church member is not eligible for attendance on this event",
+            detail="User is not eligible for attendance on this event",
         )
 
     stmt = select(EventAttendance).where(
         EventAttendance.event_id == event_id,
-        EventAttendance.church_member_id == church_member_id,
+        EventAttendance.user_id == user_id,
     )
     row = (await session.execute(stmt)).scalar_one_or_none()
     if row is None:
@@ -239,9 +227,9 @@ async def patch_event_attendance(
     row.recorded_by_user_id = admin_user_id
     await session.commit()
     await session.refresh(row)
-    await session.refresh(row, attribute_names=["church_member"])
-    await session.refresh(row.church_member, attribute_names=["linked_user"])
-    return _to_row(row, row.church_member)
+    await session.refresh(row, attribute_names=["subject_user"])
+    await session.refresh(row.subject_user, attribute_names=["member_profile"])
+    return _to_row(row, row.subject_user)
 
 
 async def get_my_attendance_for_event(
@@ -256,25 +244,15 @@ async def get_my_attendance_for_event(
     if not allowed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    if user.member_id is None:
-        return MyAttendanceResponse(
-            event_id=event_id,
-            user_id=user.id,
-            church_member_id=None,
-            status=None,
-            recorded=False,
-        )
-
     stmt = select(EventAttendance).where(
         EventAttendance.event_id == event_id,
-        EventAttendance.church_member_id == user.member_id,
+        EventAttendance.user_id == user.id,
     )
     att_row = (await session.execute(stmt)).scalar_one_or_none()
     if att_row is None:
         return MyAttendanceResponse(
             event_id=event_id,
             user_id=user.id,
-            church_member_id=user.member_id,
             status=None,
             recorded=False,
         )
@@ -282,7 +260,6 @@ async def get_my_attendance_for_event(
     return MyAttendanceResponse(
         event_id=event_id,
         user_id=user.id,
-        church_member_id=user.member_id,
         status=att_row.status,
         recorded=True,
     )

@@ -191,7 +191,9 @@ class ChurchMemberStatsResponse(BaseModel):
 
 
 class EligibleChurchMemberListItem(BaseModel):
-    id: uuid.UUID
+    """Eligible **app user** for event attendance/volunteers (legacy name kept for API stability)."""
+
+    id: uuid.UUID = Field(description="User id (subject for attendance and volunteer APIs).")
     full_name: str
     email: str | None
     phone: str | None
