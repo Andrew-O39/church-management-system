@@ -66,3 +66,30 @@ class ChurchMembershipStatus(str, enum.Enum):
     VISITOR = "visitor"
     TRANSFERRED = "transferred"
     DECEASED = "deceased"
+
+
+class NotificationCategory(str, enum.Enum):
+    GENERAL = "general"
+    EVENT = "event"
+    VOLUNTEER = "volunteer"
+    MINISTRY = "ministry"
+    SYSTEM = "system"
+
+
+class NotificationAudienceType(str, enum.Enum):
+    DIRECT_USERS = "direct_users"
+    MINISTRY_MEMBERS = "ministry_members"
+    EVENT_VOLUNTEERS = "event_volunteers"
+
+
+class NotificationChannel(str, enum.Enum):
+    IN_APP = "in_app"
+    SMS = "sms"
+    WHATSAPP = "whatsapp"
+
+
+class NotificationRecipientStatus(str, enum.Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"

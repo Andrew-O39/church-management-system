@@ -15,7 +15,9 @@ function isProtectedPath(pathname: string) {
     pathname === "/ministries" ||
     pathname.startsWith("/ministries/") ||
     pathname === "/volunteers" ||
-    pathname.startsWith("/volunteers/")
+    pathname.startsWith("/volunteers/") ||
+    pathname === "/notifications" ||
+    pathname.startsWith("/notifications/")
   );
 }
 
@@ -46,6 +48,8 @@ export const config = {
     "/ministries/:path*",
     "/volunteers",
     "/volunteers/:path*",
+    "/notifications",
+    "/notifications/:path*",
   ],
 };
 

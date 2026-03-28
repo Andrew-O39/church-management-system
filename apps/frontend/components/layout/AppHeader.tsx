@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "components/providers/AuthProvider";
 import { getAccessToken } from "lib/session";
 import { logoutAndRedirect } from "lib/auth";
+import { apiFetch } from "lib/api";
+import type { UnreadCountResponse } from "lib/types";
 
 function formatRole(role: string) {
   return role.split("_").join(" ");
@@ -40,14 +42,42 @@ export default function AppHeader() {
   const { user, status, isAdmin } = useAuth();
 
   const [hasSessionCookie, setHasSessionCookie] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
 
   const refreshCookieHint = useCallback(() => {
     setHasSessionCookie(!!getAccessToken());
   }, []);
 
+  const refreshUnread = useCallback(async () => {
+    const t = getAccessToken();
+    if (!t || status !== "authenticated") {
+      setUnreadCount(null);
+      return;
+    }
+    try {
+      const res = await apiFetch<UnreadCountResponse>("/api/v1/notifications/me/unread-count", {
+        method: "GET",
+        token: t,
+      });
+      setUnreadCount(res.unread_count);
+    } catch {
+      setUnreadCount(null);
+    }
+  }, [status]);
+
   useEffect(() => {
     refreshCookieHint();
   }, [pathname, status, refreshCookieHint]);
+
+  useEffect(() => {
+    void refreshUnread();
+  }, [pathname, status, refreshUnread]);
+
+  useEffect(() => {
+    const onUpdated = () => void refreshUnread();
+    window.addEventListener("notifications:updated", onUpdated);
+    return () => window.removeEventListener("notifications:updated", onUpdated);
+  }, [refreshUnread]);
 
   const showAuthenticatedChrome =
     status === "authenticated" || (status === "loading" && hasSessionCookie);
@@ -95,6 +125,19 @@ export default function AppHeader() {
                 active={pathname === "/events" || pathname.startsWith("/events/")}
               >
                 Events
+              </NavLink>
+              <NavLink
+                href="/notifications"
+                active={pathname === "/notifications" || pathname.startsWith("/notifications/")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Notifications
+                  {unreadCount !== null && unreadCount > 0 ? (
+                    <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  ) : null}
+                </span>
               </NavLink>
               {status === "authenticated" ? (
                 <NavLink

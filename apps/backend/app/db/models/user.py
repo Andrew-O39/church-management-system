@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from app.db.models.member_profile import MemberProfile
     from app.db.models.ministry_group import MinistryGroup
     from app.db.models.ministry_membership import MinistryMembership
+    from app.db.models.notification import Notification
+    from app.db.models.notification_recipient import NotificationRecipient
 
 
 class User(Base):
@@ -83,4 +85,12 @@ class User(Base):
         back_populates="user",
         foreign_keys="MinistryMembership.user_id",
         cascade="all, delete-orphan",
+    )
+    sent_notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="created_by",
+        foreign_keys="Notification.created_by_user_id",
+    )
+    notification_recipients: Mapped[list["NotificationRecipient"]] = relationship(
+        back_populates="user",
+        foreign_keys="NotificationRecipient.user_id",
     )

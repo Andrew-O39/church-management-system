@@ -27,6 +27,25 @@ export type UserOut = {
 
 export type MeResponse = UserOut;
 
+/** GET /api/v1/users/search (admin) — app user picker. */
+export type UserSearchItem = {
+  user_id: string;
+  full_name: string;
+  email: string;
+  phone_number: string | null;
+  role: UserRole;
+  member_id: string | null;
+  linked_church_member_name: string | null;
+  registry_link_status: "unlinked" | "linked_this_member" | "linked_other_member" | null;
+};
+
+export type UserSearchResponse = {
+  items: UserSearchItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 /** Matches backend `RegisterResponse` from POST /api/v1/auth/register (201). */
 export type RegisterResponse = JwtTokenResponse & {
   user: UserOut;
@@ -450,5 +469,110 @@ export type MyVolunteerAssignmentsResponse = {
 
 export type MyEventVolunteerAssignmentsResponse = {
   items: VolunteerAssignmentRow[];
+};
+
+// --- Notifications (Step 11) ---
+
+export type NotificationCategory =
+  | "general"
+  | "event"
+  | "volunteer"
+  | "ministry"
+  | "system";
+
+export type NotificationAudienceType =
+  | "direct_users"
+  | "ministry_members"
+  | "event_volunteers";
+
+export type NotificationChannel = "in_app" | "sms" | "whatsapp";
+
+export type NotificationRecipientStatus =
+  | "pending"
+  | "sent"
+  | "delivered"
+  | "read";
+
+export type MyNotificationItem = {
+  notification_id: string;
+  title: string;
+  body: string;
+  category: NotificationCategory;
+  delivery_channel: NotificationChannel;
+  related_event_id: string | null;
+  related_ministry_id: string | null;
+  sent_at: string | null;
+  created_at: string;
+  recipient_status: NotificationRecipientStatus;
+  read_at: string | null;
+};
+
+export type MyNotificationsResponse = {
+  items: MyNotificationItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type UnreadCountResponse = {
+  unread_count: number;
+};
+
+export type NotificationListItem = {
+  id: string;
+  title: string;
+  category: NotificationCategory;
+  delivery_channel: NotificationChannel;
+  audience_type: NotificationAudienceType;
+  related_event_id: string | null;
+  related_ministry_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  sent_at: string | null;
+  recipient_count: number;
+};
+
+export type NotificationListResponse = {
+  items: NotificationListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type NotificationRecipientRow = {
+  id: string;
+  user_id: string;
+  status: NotificationRecipientStatus;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationDetailResponse = {
+  id: string;
+  title: string;
+  body: string;
+  category: NotificationCategory;
+  delivery_channel: NotificationChannel;
+  audience_type: NotificationAudienceType;
+  related_event_id: string | null;
+  related_ministry_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  recipients: NotificationRecipientRow[];
+};
+
+/** POST /api/v1/notifications/ */
+export type NotificationCreateRequest = {
+  title: string;
+  body: string;
+  category: NotificationCategory;
+  delivery_channel: NotificationChannel;
+  audience_type: NotificationAudienceType;
+  user_ids?: string[];
+  ministry_id?: string;
+  event_id?: string;
 };
 
