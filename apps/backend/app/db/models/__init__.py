@@ -10,6 +10,7 @@ from app.db.models.user import User
 from app.db.models.volunteer_assignment import VolunteerAssignment
 from app.db.models.volunteer_role import VolunteerRole
 from app.db.models.notification import Notification
+from app.db.models.notification_delivery_attempt import NotificationDeliveryAttempt
 from app.db.models.notification_recipient import NotificationRecipient
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "VolunteerRole",
     "VolunteerAssignment",
     "Notification",
+    "NotificationDeliveryAttempt",
     "NotificationRecipient",
 ]

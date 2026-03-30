@@ -10,10 +10,12 @@ import { getAccessToken } from "lib/session";
 import { isInactiveAccountError, isUnauthorized, toErrorMessage } from "lib/errors";
 import { useAuth } from "components/providers/AuthProvider";
 import type {
+  DeliverySummary,
   EventListResponse,
   MinistryListResponse,
   MyNotificationItem,
   MyNotificationsResponse,
+  NotificationChannel,
   NotificationCreateRequest,
   NotificationDetailResponse,
   NotificationListResponse,
@@ -81,6 +83,9 @@ export default function NotificationsPage() {
   const [ministryId, setMinistryId] = useState("");
   const [eventId, setEventId] = useState("");
   const [sending, setSending] = useState(false);
+  const [channelInApp, setChannelInApp] = useState(true);
+  const [channelSms, setChannelSms] = useState(false);
+  const [lastSendSummary, setLastSendSummary] = useState<DeliverySummary | null>(null);
 
   const [userSearchInput, setUserSearchInput] = useState("");
   const [debouncedUserSearch, setDebouncedUserSearch] = useState("");
@@ -232,18 +237,26 @@ export default function NotificationsPage() {
   const onSend = async (e: FormEvent) => {
     e.preventDefault();
     if (!token || !isAdmin) return;
+    const channels: NotificationChannel[] = [];
+    if (channelInApp) channels.push("in_app");
+    if (channelSms) channels.push("sms");
+    if (channels.length === 0) {
+      setError("Choose at least one delivery channel (in-app and/or SMS).");
+      return;
+    }
     if (audienceType === "direct_users" && selectedDirectUsers.length === 0) {
       setError("Select at least one app user to notify.");
       return;
     }
     setSending(true);
     setError(null);
+    setLastSendSummary(null);
     try {
       const base = {
         title: sendTitle.trim(),
         body: sendBody.trim(),
         category: sendCategory,
-        delivery_channel: "in_app" as const,
+        channels,
         audience_type: audienceType,
       };
 
@@ -258,11 +271,12 @@ export default function NotificationsPage() {
         req = { ...base, event_id: eventId };
       }
 
-      await apiFetch<NotificationDetailResponse>("/api/v1/notifications/", {
+      const created = await apiFetch<NotificationDetailResponse>("/api/v1/notifications/", {
         method: "POST",
         token,
         body: req,
       });
+      if (created.delivery_summary) setLastSendSummary(created.delivery_summary);
       setSendTitle("");
       setSendBody("");
       setSelectedDirectUsers([]);
@@ -293,8 +307,8 @@ export default function NotificationsPage() {
       title="Notifications"
       description={
         isAdmin
-          ? "Send in-app messages to app users and review what was sent."
-          : "Messages and announcements sent to your account."
+          ? "Send messages to app users (in-app, SMS, or both). Parish registry records are never messaged."
+          : "In-app messages sent to your account."
       }
     >
       {error ? (
@@ -305,10 +319,32 @@ export default function NotificationsPage() {
 
       {isAdmin ? (
         <ContentCard>
-          <h2 className="text-lg font-semibold text-slate-900">Send in-app notification</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Send notification</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Recipients are resolved when you send. Only active app users receive messages.
+            Recipients are app users only. SMS uses the phone number on each user&apos;s app profile
+            (not the parish registry).
           </p>
+          {lastSendSummary ? (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              <p className="font-medium">Send result</p>
+              <ul className="mt-1 list-inside list-disc text-emerald-800">
+                <li>
+                  Channels: {lastSendSummary.channels.join(", ")} · audience{" "}
+                  {lastSendSummary.audience_resolved_count}
+                </li>
+                {lastSendSummary.in_app_recipient_count > 0 ? (
+                  <li>In-app recipients: {lastSendSummary.in_app_recipient_count}</li>
+                ) : null}
+                {lastSendSummary.sms_attempted > 0 || lastSendSummary.sms_skipped_no_phone > 0 ? (
+                  <li>
+                    SMS attempted: {lastSendSummary.sms_attempted}, sent: {lastSendSummary.sms_sent},
+                    failed: {lastSendSummary.sms_failed}, skipped (no profile phone):{" "}
+                    {lastSendSummary.sms_skipped_no_phone}
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
           <form className="mt-4 space-y-4" onSubmit={onSend}>
             <div>
               <label className="block text-sm font-medium text-slate-700">Title</label>
@@ -343,6 +379,32 @@ export default function NotificationsPage() {
                 ))}
               </select>
             </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-slate-700">Delivery channels</legend>
+              <p className="text-xs text-slate-500">Choose one or both. WhatsApp is not available yet.</p>
+              <label className="flex items-center gap-2 text-sm text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={channelInApp}
+                  onChange={(e) => setChannelInApp(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                In-app (inbox + unread badge)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={channelSms}
+                  onChange={(e) => setChannelSms(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                SMS (Twilio when configured in server environment)
+              </label>
+              <label className="flex cursor-not-allowed items-center gap-2 text-sm text-slate-400">
+                <input type="checkbox" disabled checked={false} className="rounded border-slate-300" />
+                WhatsApp (coming soon)
+              </label>
+            </fieldset>
             <div>
               <label className="block text-sm font-medium text-slate-700">Audience</label>
               <select
@@ -498,10 +560,24 @@ export default function NotificationsPage() {
                 </select>
               </div>
             ) : null}
+            {channelSms && audienceType === "direct_users" &&
+            selectedDirectUsers.some((u) => !u.phone_number?.trim()) ? (
+              <p className="text-sm text-amber-800">
+                Some selected users have no phone on their app profile — SMS will be skipped for them
+                (in-app delivery still applies if enabled).
+              </p>
+            ) : null}
+            {channelSms && audienceType !== "direct_users" ? (
+              <p className="text-sm text-amber-800">
+                SMS uses each member&apos;s app profile phone only. Users without a number are skipped for
+                SMS; enable in-app if everyone should see the message.
+              </p>
+            ) : null}
             <button
               type="submit"
               disabled={
                 sending ||
+                (!channelInApp && !channelSms) ||
                 (audienceType === "direct_users" && selectedDirectUsers.length === 0)
               }
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
@@ -537,6 +613,11 @@ export default function NotificationsPage() {
                     <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{n.body}</p>
                     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
                       <span className="rounded bg-slate-100 px-1.5 py-0.5">{n.category}</span>
+                      {n.channels.map((c) => (
+                        <span key={c} className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-800">
+                          {c}
+                        </span>
+                      ))}
                       <span>{formatDateTime(n.sent_at ?? n.created_at)}</span>
                       {n.related_event_id ? (
                         <Link
@@ -611,8 +692,15 @@ export default function NotificationsPage() {
                   <div>
                     <p className="font-medium text-slate-900">{s.title}</p>
                     <p className="text-xs text-slate-500">
-                      {s.category} · {s.audience_type} · {s.recipient_count} recipients ·{" "}
-                      {formatDateTime(s.sent_at ?? s.created_at)}
+                      {s.category} · {s.audience_type} ·{" "}
+                      <span className="inline-flex flex-wrap gap-1">
+                        {s.channels.map((c) => (
+                          <span key={c} className="rounded bg-slate-100 px-1 font-medium">
+                            {c}
+                          </span>
+                        ))}
+                      </span>{" "}
+                      · {s.recipient_count} recipients · {formatDateTime(s.sent_at ?? s.created_at)}
                     </p>
                   </div>
                   <Link

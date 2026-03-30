@@ -4,14 +4,13 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import DateTime, Enum, ForeignKey, JSON, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.models.enums import (
     NotificationAudienceType,
     NotificationCategory,
-    NotificationChannel,
 )
 
 if TYPE_CHECKING:
@@ -43,15 +42,7 @@ class Notification(Base):
         nullable=False,
         index=True,
     )
-    delivery_channel: Mapped[NotificationChannel] = mapped_column(
-        Enum(
-            NotificationChannel,
-            native_enum=False,
-            values_callable=lambda e: [i.value for i in e],
-        ),
-        nullable=False,
-        index=True,
-    )
+    channels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     audience_type: Mapped[NotificationAudienceType] = mapped_column(
         Enum(
             NotificationAudienceType,

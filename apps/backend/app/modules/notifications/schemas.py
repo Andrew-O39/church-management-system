@@ -3,12 +3,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.db.models.enums import (
     NotificationAudienceType,
     NotificationCategory,
     NotificationChannel,
+    NotificationDeliveryAttemptStatus,
     NotificationRecipientStatus,
 )
 
@@ -17,17 +18,34 @@ class NotificationCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     body: str = Field(..., min_length=1)
     category: NotificationCategory
-    delivery_channel: NotificationChannel = NotificationChannel.IN_APP
+    channels: list[NotificationChannel] = Field(
+        ...,
+        min_length=1,
+        description="At least one channel; combine in_app and sms for multi-channel sends.",
+    )
     audience_type: NotificationAudienceType
     user_ids: list[uuid.UUID] | None = None
     ministry_id: uuid.UUID | None = None
     event_id: uuid.UUID | None = None
 
+    @model_validator(mode="after")
+    def dedupe_channels(self) -> NotificationCreateRequest:
+        seen: set[str] = set()
+        uniq: list[NotificationChannel] = []
+        for c in self.channels:
+            if c.value in seen:
+                continue
+            seen.add(c.value)
+            uniq.append(c)
+        if not uniq:
+            raise ValueError("channels must not be empty after deduplication")
+        object.__setattr__(self, "channels", uniq)
+        return self
+
     @field_validator("title", "body")
     @classmethod
     def strip_text(cls, v: str) -> str:
-        s = v.strip()
-        return s
+        return v.strip()
 
     @field_validator("title")
     @classmethod
@@ -44,6 +62,18 @@ class NotificationCreateRequest(BaseModel):
         return v
 
 
+class DeliveryAttemptRow(BaseModel):
+    id: uuid.UUID
+    channel: NotificationChannel
+    status: NotificationDeliveryAttemptStatus
+    provider_message_id: str | None
+    error_detail: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class NotificationRecipientRow(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -51,15 +81,24 @@ class NotificationRecipientRow(BaseModel):
     read_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    delivery_attempts: list[DeliveryAttemptRow]
 
-    model_config = {"from_attributes": True}
+
+class DeliverySummary(BaseModel):
+    audience_resolved_count: int
+    channels: list[str]
+    in_app_recipient_count: int
+    sms_skipped_no_phone: int
+    sms_attempted: int
+    sms_sent: int
+    sms_failed: int
 
 
 class NotificationListItem(BaseModel):
     id: uuid.UUID
     title: str
     category: NotificationCategory
-    delivery_channel: NotificationChannel
+    channels: list[str]
     audience_type: NotificationAudienceType
     related_event_id: uuid.UUID | None
     related_ministry_id: uuid.UUID | None
@@ -83,7 +122,7 @@ class NotificationDetailResponse(BaseModel):
     title: str
     body: str
     category: NotificationCategory
-    delivery_channel: NotificationChannel
+    channels: list[str]
     audience_type: NotificationAudienceType
     related_event_id: uuid.UUID | None
     related_ministry_id: uuid.UUID | None
@@ -91,9 +130,8 @@ class NotificationDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     sent_at: datetime | None
+    delivery_summary: DeliverySummary | None
     recipients: list[NotificationRecipientRow]
-
-    model_config = {"from_attributes": True}
 
 
 class MyNotificationItem(BaseModel):
@@ -101,7 +139,7 @@ class MyNotificationItem(BaseModel):
     title: str
     body: str
     category: NotificationCategory
-    delivery_channel: NotificationChannel
+    channels: list[str]
     related_event_id: uuid.UUID | None
     related_ministry_id: uuid.UUID | None
     sent_at: datetime | None

@@ -12,17 +12,23 @@ from app.db.models.enums import (
     NotificationAudienceType,
     NotificationCategory,
     NotificationChannel,
+    NotificationDeliveryAttemptStatus,
     NotificationRecipientStatus,
 )
 from app.db.models.ministry_membership import MinistryMembership
 from app.db.models.notification import Notification
+from app.db.models.notification_delivery_attempt import NotificationDeliveryAttempt
 from app.db.models.notification_recipient import NotificationRecipient
 from app.db.models.user import User
 from app.db.models.volunteer_assignment import VolunteerAssignment
 from app.modules.auth import service as auth_service
 from app.modules.events import service as events_service
 from app.modules.ministries import service as ministries_service
+from app.modules.notifications.phone import sms_phone_from_user_profile
+from app.modules.notifications.providers.sms import send_sms_twilio
 from app.modules.notifications.schemas import (
+    DeliveryAttemptRow,
+    DeliverySummary,
     MarkAllReadResponse,
     MarkReadResponse,
     MyNotificationItem,
@@ -36,10 +42,16 @@ from app.modules.notifications.schemas import (
 )
 
 _MAX_PAGE_SIZE = 100
+_SMS_BODY_MAX = 1500
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _sms_body_text(title: str, body: str) -> str:
+    text = f"{title}\n\n{body}".strip()
+    return text[:_SMS_BODY_MAX]
 
 
 async def _resolve_recipient_user_ids(
@@ -106,17 +118,59 @@ async def _resolve_recipient_user_ids(
     )
 
 
+def _recipient_row_from_orm(r: NotificationRecipient) -> NotificationRecipientRow:
+    attempts = sorted(r.delivery_attempts, key=lambda a: (a.channel.value, a.created_at))
+    return NotificationRecipientRow(
+        id=r.id,
+        user_id=r.user_id,
+        status=r.status,
+        read_at=r.read_at,
+        created_at=r.created_at,
+        updated_at=r.updated_at,
+        delivery_attempts=[DeliveryAttemptRow.model_validate(a) for a in attempts],
+    )
+
+
+def notification_detail_response(
+    n: Notification,
+    *,
+    delivery_summary: DeliverySummary | None = None,
+) -> NotificationDetailResponse:
+    recs = sorted(n.recipients, key=lambda r: r.created_at)
+    return NotificationDetailResponse(
+        id=n.id,
+        title=n.title,
+        body=n.body,
+        category=n.category,
+        channels=list(n.channels),
+        audience_type=n.audience_type,
+        related_event_id=n.related_event_id,
+        related_ministry_id=n.related_ministry_id,
+        created_by_user_id=n.created_by_user_id,
+        created_at=n.created_at,
+        updated_at=n.updated_at,
+        sent_at=n.sent_at,
+        delivery_summary=delivery_summary,
+        recipients=[_recipient_row_from_orm(r) for r in recs],
+    )
+
+
 async def create_and_send_notification(
     session: AsyncSession,
     *,
     admin: User,
     body: NotificationCreateRequest,
 ) -> NotificationDetailResponse:
-    if body.delivery_channel != NotificationChannel.IN_APP:
+    if NotificationChannel.WHATSAPP in body.channels:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only in_app delivery is supported in this release",
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="WhatsApp delivery is not implemented yet. Remove whatsapp from channels.",
         )
+
+    channels_sorted = sorted(body.channels, key=lambda c: c.value)
+    channel_values = [c.value for c in channels_sorted]
+    in_app = NotificationChannel.IN_APP in body.channels
+    sms_ch = NotificationChannel.SMS in body.channels
 
     recipient_ids = await _resolve_recipient_user_ids(
         session,
@@ -131,6 +185,14 @@ async def create_and_send_notification(
             detail="No recipients resolved for this audience",
         )
 
+    stmt_users = (
+        select(User)
+        .where(User.id.in_(recipient_ids))
+        .options(selectinload(User.member_profile))
+    )
+    users = list((await session.execute(stmt_users)).unique().scalars().all())
+    users_by_id = {u.id: u for u in users}
+
     related_event_id: uuid.UUID | None = None
     related_ministry_id: uuid.UUID | None = None
     if body.audience_type == NotificationAudienceType.MINISTRY_MEMBERS:
@@ -138,12 +200,29 @@ async def create_and_send_notification(
     elif body.audience_type == NotificationAudienceType.EVENT_VOLUNTEERS:
         related_event_id = body.event_id
 
+    if sms_ch and not in_app:
+        if not any(sms_phone_from_user_profile(users_by_id[uid]) for uid in recipient_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No recipients have a phone number on their app profile for SMS delivery.",
+            )
+
+    if in_app:
+        reachable = True
+    else:
+        reachable = any(sms_phone_from_user_profile(users_by_id[uid]) for uid in recipient_ids)
+    if not reachable:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No recipients can be reached with the selected channels.",
+        )
+
     now = _now()
     n = Notification(
         title=body.title,
         body=body.body,
         category=body.category,
-        delivery_channel=body.delivery_channel,
+        channels=channel_values,
         audience_type=body.audience_type,
         related_event_id=related_event_id,
         related_ministry_id=related_ministry_id,
@@ -153,43 +232,141 @@ async def create_and_send_notification(
     session.add(n)
     await session.flush()
 
+    sms_skipped_no_phone = 0
+    sms_attempted = 0
+    sms_sent = 0
+    sms_failed = 0
+    sms_payload = _sms_body_text(body.title, body.body)
+    pending_sms: list[tuple[NotificationDeliveryAttempt, str]] = []
+
     for uid in recipient_ids:
-        session.add(
-            NotificationRecipient(
-                notification_id=n.id,
-                user_id=uid,
-                status=NotificationRecipientStatus.DELIVERED,
-            )
+        u = users_by_id[uid]
+        rec_status = (
+            NotificationRecipientStatus.DELIVERED
+            if in_app
+            else NotificationRecipientStatus.EXTERNAL_ONLY
         )
+        rec = NotificationRecipient(
+            notification_id=n.id,
+            user_id=uid,
+            status=rec_status,
+        )
+        session.add(rec)
+        await session.flush()
+
+        if in_app:
+            session.add(
+                NotificationDeliveryAttempt(
+                    notification_recipient_id=rec.id,
+                    channel=NotificationChannel.IN_APP,
+                    status=NotificationDeliveryAttemptStatus.DELIVERED,
+                )
+            )
+
+        if sms_ch:
+            phone = sms_phone_from_user_profile(u)
+            if not phone:
+                sms_skipped_no_phone += 1
+                session.add(
+                    NotificationDeliveryAttempt(
+                        notification_recipient_id=rec.id,
+                        channel=NotificationChannel.SMS,
+                        status=NotificationDeliveryAttemptStatus.FAILED,
+                        error_detail="No phone number on app profile",
+                    )
+                )
+            else:
+                sms_attempted += 1
+                att = NotificationDeliveryAttempt(
+                    notification_recipient_id=rec.id,
+                    channel=NotificationChannel.SMS,
+                    status=NotificationDeliveryAttemptStatus.PENDING,
+                )
+                session.add(att)
+                await session.flush()
+                pending_sms.append((att, phone))
+
+    for att, phone in pending_sms:
+        result = await send_sms_twilio(to_e164=phone, body=sms_payload)
+        if result.ok:
+            att.status = NotificationDeliveryAttemptStatus.SENT
+            att.provider_message_id = result.provider_message_id
+            sms_sent += 1
+        else:
+            att.status = NotificationDeliveryAttemptStatus.FAILED
+            att.error_detail = result.error_message
+            sms_failed += 1
 
     await session.commit()
-    await session.refresh(n)
+
+    summary = DeliverySummary(
+        audience_resolved_count=len(recipient_ids),
+        channels=channel_values,
+        in_app_recipient_count=len(recipient_ids) if in_app else 0,
+        sms_skipped_no_phone=sms_skipped_no_phone,
+        sms_attempted=sms_attempted,
+        sms_sent=sms_sent,
+        sms_failed=sms_failed,
+    )
 
     stmt = (
         select(Notification)
         .where(Notification.id == n.id)
-        .options(selectinload(Notification.recipients))
+        .options(
+            selectinload(Notification.recipients).selectinload(
+                NotificationRecipient.delivery_attempts,
+            ),
+        )
     )
     n2 = (await session.execute(stmt)).scalar_one()
-    return notification_detail_response(n2)
+    return notification_detail_response(n2, delivery_summary=summary)
 
 
-def notification_detail_response(n: Notification) -> NotificationDetailResponse:
-    recs = sorted(n.recipients, key=lambda r: r.created_at)
-    return NotificationDetailResponse(
-        id=n.id,
-        title=n.title,
-        body=n.body,
-        category=n.category,
-        delivery_channel=n.delivery_channel,
-        audience_type=n.audience_type,
-        related_event_id=n.related_event_id,
-        related_ministry_id=n.related_ministry_id,
-        created_by_user_id=n.created_by_user_id,
-        created_at=n.created_at,
-        updated_at=n.updated_at,
-        sent_at=n.sent_at,
-        recipients=[NotificationRecipientRow.model_validate(r) for r in recs],
+async def _build_summary_from_notification(
+    session: AsyncSession,
+    n: Notification,
+) -> DeliverySummary | None:
+    if not n.recipients:
+        return None
+    channel_values = list(n.channels)
+    in_app = NotificationChannel.IN_APP.value in channel_values
+    stmt = (
+        select(NotificationDeliveryAttempt)
+        .join(NotificationRecipient)
+        .where(NotificationRecipient.notification_id == n.id)
+    )
+    attempts = list((await session.execute(stmt)).scalars().all())
+    sms_all = [a for a in attempts if a.channel == NotificationChannel.SMS]
+    sms_skipped = sum(
+        1
+        for a in sms_all
+        if a.status == NotificationDeliveryAttemptStatus.FAILED
+        and (a.error_detail or "").startswith("No phone number")
+    )
+    sms_attempted = len(sms_all) - sms_skipped
+    sms_sent = sum(
+        1
+        for a in sms_all
+        if a.status
+        in (
+            NotificationDeliveryAttemptStatus.SENT,
+            NotificationDeliveryAttemptStatus.DELIVERED,
+        )
+    )
+    sms_failed = sum(
+        1
+        for a in sms_all
+        if a.status == NotificationDeliveryAttemptStatus.FAILED
+        and not (a.error_detail or "").startswith("No phone number")
+    )
+    return DeliverySummary(
+        audience_resolved_count=len(n.recipients),
+        channels=channel_values,
+        in_app_recipient_count=len(n.recipients) if in_app else 0,
+        sms_skipped_no_phone=sms_skipped,
+        sms_attempted=sms_attempted,
+        sms_sent=sms_sent,
+        sms_failed=sms_failed,
     )
 
 
@@ -199,6 +376,7 @@ async def list_notifications_admin(
     category: NotificationCategory | None,
     related_event_id: uuid.UUID | None,
     related_ministry_id: uuid.UUID | None,
+    channel: NotificationChannel | None,
     page: int,
     page_size: int,
 ) -> NotificationListResponse:
@@ -213,6 +391,9 @@ async def list_notifications_admin(
     if related_ministry_id is not None:
         count_stmt = count_stmt.where(Notification.related_ministry_id == related_ministry_id)
         list_stmt = list_stmt.where(Notification.related_ministry_id == related_ministry_id)
+    if channel is not None:
+        count_stmt = count_stmt.where(Notification.channels.contains([channel.value]))
+        list_stmt = list_stmt.where(Notification.channels.contains([channel.value]))
 
     total = int((await session.execute(count_stmt)).scalar_one())
 
@@ -228,7 +409,7 @@ async def list_notifications_admin(
             id=r.id,
             title=r.title,
             category=r.category,
-            delivery_channel=r.delivery_channel,
+            channels=list(r.channels),
             audience_type=r.audience_type,
             related_event_id=r.related_event_id,
             related_ministry_id=r.related_ministry_id,
@@ -255,12 +436,17 @@ async def get_notification_admin(
     stmt = (
         select(Notification)
         .where(Notification.id == notification_id)
-        .options(selectinload(Notification.recipients))
+        .options(
+            selectinload(Notification.recipients).selectinload(
+                NotificationRecipient.delivery_attempts,
+            ),
+        )
     )
     n = (await session.execute(stmt)).scalar_one_or_none()
     if n is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
-    return notification_detail_response(n)
+    summary = await _build_summary_from_notification(session, n)
+    return notification_detail_response(n, delivery_summary=summary)
 
 
 async def list_my_notifications(
@@ -274,14 +460,30 @@ async def list_my_notifications(
         select(func.count())
         .select_from(NotificationRecipient)
         .join(Notification, NotificationRecipient.notification_id == Notification.id)
-        .where(NotificationRecipient.user_id == user.id)
+        .where(
+            NotificationRecipient.user_id == user.id,
+            NotificationRecipient.status.in_(
+                (
+                    NotificationRecipientStatus.DELIVERED,
+                    NotificationRecipientStatus.READ,
+                ),
+            ),
+        )
     )
     total = int((await session.execute(count_stmt)).scalar_one())
 
     stmt = (
         select(NotificationRecipient, Notification)
-        .join(Notification, NotificationRecipient.notification_id == Notification.id)
-        .where(NotificationRecipient.user_id == user.id)
+        .join(Notification, Notification.id == NotificationRecipient.notification_id)
+        .where(
+            NotificationRecipient.user_id == user.id,
+            NotificationRecipient.status.in_(
+                (
+                    NotificationRecipientStatus.DELIVERED,
+                    NotificationRecipientStatus.READ,
+                ),
+            ),
+        )
         .order_by(Notification.sent_at.desc().nulls_last(), Notification.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
@@ -296,7 +498,7 @@ async def list_my_notifications(
                 title=n.title,
                 body=n.body,
                 category=n.category,
-                delivery_channel=n.delivery_channel,
+                channels=list(n.channels),
                 related_event_id=n.related_event_id,
                 related_ministry_id=n.related_ministry_id,
                 sent_at=n.sent_at,
@@ -339,6 +541,11 @@ async def mark_notification_read(
     rec = (await session.execute(stmt)).scalar_one_or_none()
     if rec is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    if rec.status == NotificationRecipientStatus.EXTERNAL_ONLY:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not in inbox",
+        )
     if rec.status != NotificationRecipientStatus.READ:
         rec.status = NotificationRecipientStatus.READ
         rec.read_at = _now()

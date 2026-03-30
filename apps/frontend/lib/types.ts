@@ -491,14 +491,21 @@ export type NotificationRecipientStatus =
   | "pending"
   | "sent"
   | "delivered"
-  | "read";
+  | "read"
+  | "external_only";
+
+export type NotificationDeliveryAttemptStatus =
+  | "pending"
+  | "sent"
+  | "delivered"
+  | "failed";
 
 export type MyNotificationItem = {
   notification_id: string;
   title: string;
   body: string;
   category: NotificationCategory;
-  delivery_channel: NotificationChannel;
+  channels: string[];
   related_event_id: string | null;
   related_ministry_id: string | null;
   sent_at: string | null;
@@ -522,7 +529,7 @@ export type NotificationListItem = {
   id: string;
   title: string;
   category: NotificationCategory;
-  delivery_channel: NotificationChannel;
+  channels: string[];
   audience_type: NotificationAudienceType;
   related_event_id: string | null;
   related_ministry_id: string | null;
@@ -539,6 +546,16 @@ export type NotificationListResponse = {
   page_size: number;
 };
 
+export type DeliveryAttemptRow = {
+  id: string;
+  channel: NotificationChannel;
+  status: NotificationDeliveryAttemptStatus;
+  provider_message_id: string | null;
+  error_detail: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NotificationRecipientRow = {
   id: string;
   user_id: string;
@@ -546,6 +563,17 @@ export type NotificationRecipientRow = {
   read_at: string | null;
   created_at: string;
   updated_at: string;
+  delivery_attempts: DeliveryAttemptRow[];
+};
+
+export type DeliverySummary = {
+  audience_resolved_count: number;
+  channels: string[];
+  in_app_recipient_count: number;
+  sms_skipped_no_phone: number;
+  sms_attempted: number;
+  sms_sent: number;
+  sms_failed: number;
 };
 
 export type NotificationDetailResponse = {
@@ -553,7 +581,7 @@ export type NotificationDetailResponse = {
   title: string;
   body: string;
   category: NotificationCategory;
-  delivery_channel: NotificationChannel;
+  channels: string[];
   audience_type: NotificationAudienceType;
   related_event_id: string | null;
   related_ministry_id: string | null;
@@ -561,6 +589,7 @@ export type NotificationDetailResponse = {
   created_at: string;
   updated_at: string;
   sent_at: string | null;
+  delivery_summary: DeliverySummary | null;
   recipients: NotificationRecipientRow[];
 };
 
@@ -569,7 +598,7 @@ export type NotificationCreateRequest = {
   title: string;
   body: string;
   category: NotificationCategory;
-  delivery_channel: NotificationChannel;
+  channels: NotificationChannel[];
   audience_type: NotificationAudienceType;
   user_ids?: string[];
   ministry_id?: string;

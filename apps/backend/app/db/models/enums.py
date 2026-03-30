@@ -89,7 +89,19 @@ class NotificationChannel(str, enum.Enum):
 
 
 class NotificationRecipientStatus(str, enum.Enum):
+    """Inbox uses DELIVERED (unread) and READ. EXTERNAL_ONLY = SMS/WhatsApp-only target."""
+
     PENDING = "pending"
     SENT = "sent"
     DELIVERED = "delivered"
     READ = "read"
+    EXTERNAL_ONLY = "external_only"
+
+
+class NotificationDeliveryAttemptStatus(str, enum.Enum):
+    """Per-channel delivery lifecycle (provider outcomes)."""
+
+    PENDING = "pending"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    FAILED = "failed"

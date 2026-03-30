@@ -106,6 +106,16 @@ export default function NotificationDetailPage() {
                 <dd>{detail.category}</dd>
               </div>
               <div>
+                <dt className="font-medium text-slate-700">Channels</dt>
+                <dd className="flex flex-wrap gap-1">
+                  {detail.channels.map((c) => (
+                    <span key={c} className="rounded bg-slate-100 px-2 py-0.5 text-xs">
+                      {c}
+                    </span>
+                  ))}
+                </dd>
+              </div>
+              <div>
                 <dt className="font-medium text-slate-700">Audience</dt>
                 <dd>{detail.audience_type}</dd>
               </div>
@@ -115,18 +125,52 @@ export default function NotificationDetailPage() {
               </div>
             </dl>
           </ContentCard>
+          {detail.delivery_summary ? (
+            <ContentCard>
+              <h3 className="text-base font-semibold text-slate-900">Delivery summary</h3>
+              <dl className="mt-2 grid gap-2 text-sm text-slate-600">
+                <div>
+                  <dt className="font-medium text-slate-700">Audience resolved</dt>
+                  <dd>{detail.delivery_summary.audience_resolved_count}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-700">In-app recipients</dt>
+                  <dd>{detail.delivery_summary.in_app_recipient_count}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-700">SMS</dt>
+                  <dd>
+                    attempted {detail.delivery_summary.sms_attempted}, sent{" "}
+                    {detail.delivery_summary.sms_sent}, failed {detail.delivery_summary.sms_failed}, skipped
+                    (no phone) {detail.delivery_summary.sms_skipped_no_phone}
+                  </dd>
+                </div>
+              </dl>
+            </ContentCard>
+          ) : null}
           <ContentCard>
             <h3 className="text-base font-semibold text-slate-900">
               Recipients ({detail.recipients.length})
             </h3>
             <ul className="mt-3 divide-y divide-slate-100">
               {detail.recipients.map((r) => (
-                <li key={r.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
-                  <span className="font-mono text-xs text-slate-700">{r.user_id}</span>
-                  <span className="text-slate-500">
-                    {r.status}
-                    {r.read_at ? ` · read ${formatDateTime(r.read_at)}` : ""}
-                  </span>
+                <li key={r.id} className="py-3 text-sm">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="font-mono text-xs text-slate-700">{r.user_id}</span>
+                    <span className="text-slate-500">
+                      {r.status}
+                      {r.read_at ? ` · read ${formatDateTime(r.read_at)}` : ""}
+                    </span>
+                  </div>
+                  <ul className="mt-2 space-y-1 border-l-2 border-slate-100 pl-3 text-xs text-slate-600">
+                    {r.delivery_attempts.map((a) => (
+                      <li key={a.id}>
+                        <span className="font-medium">{a.channel}</span>: {a.status}
+                        {a.provider_message_id ? ` · ${a.provider_message_id}` : ""}
+                        {a.error_detail ? ` — ${a.error_detail}` : ""}
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>

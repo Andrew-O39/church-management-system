@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_EMAIL: str | None = None
     BOOTSTRAP_ADMIN_PASSWORD: str | None = None
 
+    # ---- SMS (Twilio-compatible HTTP API; optional in local dev) ----
+    SMS_PROVIDER: str | None = None  # e.g. "twilio"; unset = SMS sends fail with clear message
+    SMS_ACCOUNT_SID: str | None = None
+    SMS_AUTH_TOKEN: str | None = None
+    SMS_FROM_NUMBER: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

@@ -22,6 +22,9 @@ FastAPI service for the church CMS monorepo.
    - `DATABASE_URL` — async SQLAlchemy URL, e.g. `postgresql+asyncpg://user:pass@localhost:5432/dbname`
    - `JWT_SECRET` — set to a strong secret outside local dev
    - `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — optional; see below
+   - **SMS (Twilio; optional)** — leave unset in local dev; SMS attempts are recorded as failed with a clear error until configured:
+     - `SMS_PROVIDER=twilio`
+     - `SMS_ACCOUNT_SID`, `SMS_AUTH_TOKEN`, `SMS_FROM_NUMBER` (E.164-capable sender)
 
 3. Run migrations:
 

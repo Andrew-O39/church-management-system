@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.enums import NotificationCategory, UserRole
+from app.db.models.enums import NotificationCategory, NotificationChannel, UserRole
 from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
@@ -88,6 +88,10 @@ async def list_notifications_admin(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
     category: NotificationCategory | None = Query(default=None),
+    channel: NotificationChannel | None = Query(
+        default=None,
+        description="Filter notifications that include this channel",
+    ),
     related_event_id: uuid.UUID | None = Query(default=None),
     related_ministry_id: uuid.UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
@@ -98,6 +102,7 @@ async def list_notifications_admin(
         category=category,
         related_event_id=related_event_id,
         related_ministry_id=related_ministry_id,
+        channel=channel,
         page=page,
         page_size=page_size,
     )

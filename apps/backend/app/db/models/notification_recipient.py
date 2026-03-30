@@ -12,6 +12,7 @@ from app.db.models.enums import NotificationRecipientStatus
 
 if TYPE_CHECKING:
     from app.db.models.notification import Notification
+    from app.db.models.notification_delivery_attempt import NotificationDeliveryAttempt
     from app.db.models.user import User
 
 
@@ -71,4 +72,8 @@ class NotificationRecipient(Base):
     user: Mapped["User"] = relationship(
         foreign_keys=[user_id],
         back_populates="notification_recipients",
+    )
+    delivery_attempts: Mapped[list["NotificationDeliveryAttempt"]] = relationship(
+        back_populates="recipient",
+        cascade="all, delete-orphan",
     )
