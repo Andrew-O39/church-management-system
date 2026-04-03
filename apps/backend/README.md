@@ -25,6 +25,10 @@ FastAPI service for the church CMS monorepo.
    - **SMS (Twilio; optional)** — leave unset in local dev; SMS attempts are recorded as failed with a clear error until configured:
      - `SMS_PROVIDER=twilio`
      - `SMS_ACCOUNT_SID`, `SMS_AUTH_TOKEN`, `SMS_FROM_NUMBER` (E.164-capable sender)
+   - **WhatsApp (Twilio WhatsApp; optional)** — same Twilio account can be reused; set a WhatsApp-enabled sender:
+     - `WHATSAPP_PROVIDER=twilio`
+     - `WHATSAPP_FROM_NUMBER` — e.g. `whatsapp:+14155238886` (sandbox) or your approved WhatsApp sender
+     - `WHATSAPP_ACCOUNT_SID` / `WHATSAPP_AUTH_TOKEN` — optional; default to `SMS_ACCOUNT_SID` / `SMS_AUTH_TOKEN` if unset
 
 3. Run migrations:
 

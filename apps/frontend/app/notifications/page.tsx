@@ -26,6 +26,7 @@ import type {
 } from "lib/types";
 
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import DeliverySummaryContent from "components/notifications/DeliverySummaryContent";
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
@@ -85,6 +86,7 @@ export default function NotificationsPage() {
   const [sending, setSending] = useState(false);
   const [channelInApp, setChannelInApp] = useState(true);
   const [channelSms, setChannelSms] = useState(false);
+  const [channelWhatsapp, setChannelWhatsapp] = useState(false);
   const [lastSendSummary, setLastSendSummary] = useState<DeliverySummary | null>(null);
 
   const [userSearchInput, setUserSearchInput] = useState("");
@@ -240,8 +242,9 @@ export default function NotificationsPage() {
     const channels: NotificationChannel[] = [];
     if (channelInApp) channels.push("in_app");
     if (channelSms) channels.push("sms");
+    if (channelWhatsapp) channels.push("whatsapp");
     if (channels.length === 0) {
-      setError("Choose at least one delivery channel (in-app and/or SMS).");
+      setError("Choose at least one delivery channel.");
       return;
     }
     if (audienceType === "direct_users" && selectedDirectUsers.length === 0) {
@@ -307,7 +310,7 @@ export default function NotificationsPage() {
       title="Notifications"
       description={
         isAdmin
-          ? "Send messages to app users (in-app, SMS, or both). Parish registry records are never messaged."
+          ? "Send messages to app users (in-app, SMS, WhatsApp). Parish registry records are never messaged."
           : "In-app messages sent to your account."
       }
     >
@@ -321,28 +324,16 @@ export default function NotificationsPage() {
         <ContentCard>
           <h2 className="text-lg font-semibold text-slate-900">Send notification</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Recipients are app users only. SMS uses the phone number on each user&apos;s app profile
-            (not the parish registry).
+            Recipients are app users only. SMS and WhatsApp use the phone number on each user&apos;s app
+            profile (not the parish registry). Twilio WhatsApp session messages require configured env
+            vars and an approved/sandbox sender.
           </p>
           {lastSendSummary ? (
-            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-              <p className="font-medium">Send result</p>
-              <ul className="mt-1 list-inside list-disc text-emerald-800">
-                <li>
-                  Channels: {lastSendSummary.channels.join(", ")} · audience{" "}
-                  {lastSendSummary.audience_resolved_count}
-                </li>
-                {lastSendSummary.in_app_recipient_count > 0 ? (
-                  <li>In-app recipients: {lastSendSummary.in_app_recipient_count}</li>
-                ) : null}
-                {lastSendSummary.sms_attempted > 0 || lastSendSummary.sms_skipped_no_phone > 0 ? (
-                  <li>
-                    SMS attempted: {lastSendSummary.sms_attempted}, sent: {lastSendSummary.sms_sent},
-                    failed: {lastSendSummary.sms_failed}, skipped (no profile phone):{" "}
-                    {lastSendSummary.sms_skipped_no_phone}
-                  </li>
-                ) : null}
-              </ul>
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-emerald-950">
+              <p className="font-semibold text-slate-900">Delivery summary</p>
+              <div className="mt-2 text-emerald-900">
+                <DeliverySummaryContent summary={lastSendSummary} compact />
+              </div>
             </div>
           ) : null}
           <form className="mt-4 space-y-4" onSubmit={onSend}>
@@ -381,7 +372,7 @@ export default function NotificationsPage() {
             </div>
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium text-slate-700">Delivery channels</legend>
-              <p className="text-xs text-slate-500">Choose one or both. WhatsApp is not available yet.</p>
+              <p className="text-xs text-slate-500">Choose one or more. External channels need Twilio env configuration.</p>
               <label className="flex items-center gap-2 text-sm text-slate-800">
                 <input
                   type="checkbox"
@@ -398,11 +389,16 @@ export default function NotificationsPage() {
                   onChange={(e) => setChannelSms(e.target.checked)}
                   className="rounded border-slate-300"
                 />
-                SMS (Twilio when configured in server environment)
+                SMS (Twilio)
               </label>
-              <label className="flex cursor-not-allowed items-center gap-2 text-sm text-slate-400">
-                <input type="checkbox" disabled checked={false} className="rounded border-slate-300" />
-                WhatsApp (coming soon)
+              <label className="flex items-center gap-2 text-sm text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={channelWhatsapp}
+                  onChange={(e) => setChannelWhatsapp(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                WhatsApp (Twilio WhatsApp API; session messages / sandbox)
               </label>
             </fieldset>
             <div>
@@ -560,24 +556,25 @@ export default function NotificationsPage() {
                 </select>
               </div>
             ) : null}
-            {channelSms && audienceType === "direct_users" &&
+            {(channelSms || channelWhatsapp) &&
+            audienceType === "direct_users" &&
             selectedDirectUsers.some((u) => !u.phone_number?.trim()) ? (
               <p className="text-sm text-amber-800">
-                Some selected users have no phone on their app profile — SMS will be skipped for them
-                (in-app delivery still applies if enabled).
+                Some selected users have no phone on their app profile — SMS/WhatsApp will be skipped for
+                them (in-app delivery still applies if enabled).
               </p>
             ) : null}
-            {channelSms && audienceType !== "direct_users" ? (
+            {(channelSms || channelWhatsapp) && audienceType !== "direct_users" ? (
               <p className="text-sm text-amber-800">
-                SMS uses each member&apos;s app profile phone only. Users without a number are skipped for
-                SMS; enable in-app if everyone should see the message.
+                SMS and WhatsApp use each member&apos;s app profile phone only. Users without a number are
+                skipped for those channels; enable in-app if everyone should see the message.
               </p>
             ) : null}
             <button
               type="submit"
               disabled={
                 sending ||
-                (!channelInApp && !channelSms) ||
+                (!channelInApp && !channelSms && !channelWhatsapp) ||
                 (audienceType === "direct_users" && selectedDirectUsers.length === 0)
               }
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"

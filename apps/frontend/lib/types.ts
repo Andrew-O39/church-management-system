@@ -559,6 +559,9 @@ export type DeliveryAttemptRow = {
 export type NotificationRecipientRow = {
   id: string;
   user_id: string;
+  /** Present when returned from admin notification detail (joined user). */
+  user_full_name?: string | null;
+  user_email?: string | null;
   status: NotificationRecipientStatus;
   read_at: string | null;
   created_at: string;
@@ -574,6 +577,10 @@ export type DeliverySummary = {
   sms_attempted: number;
   sms_sent: number;
   sms_failed: number;
+  whatsapp_skipped_no_phone: number;
+  whatsapp_attempted: number;
+  whatsapp_sent: number;
+  whatsapp_failed: number;
 };
 
 export type NotificationDetailResponse = {

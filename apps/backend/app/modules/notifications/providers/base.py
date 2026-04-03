@@ -25,6 +25,4 @@ class WhatsAppDeliveryResult:
 
 @runtime_checkable
 class WhatsAppProvider(Protocol):
-    """Reserved for a future WhatsApp Business API integration."""
-
-    async def send_template_message(self, *, to_e164: str, body: str) -> WhatsAppDeliveryResult: ...
+    async def send_whatsapp(self, *, to_e164: str, body: str) -> WhatsAppDeliveryResult: ...

@@ -26,6 +26,7 @@ from app.modules.events import service as events_service
 from app.modules.ministries import service as ministries_service
 from app.modules.notifications.phone import sms_phone_from_user_profile
 from app.modules.notifications.providers.sms import send_sms_twilio
+from app.modules.notifications.providers.whatsapp import send_whatsapp_twilio
 from app.modules.notifications.schemas import (
     DeliveryAttemptRow,
     DeliverySummary,
@@ -120,9 +121,16 @@ async def _resolve_recipient_user_ids(
 
 def _recipient_row_from_orm(r: NotificationRecipient) -> NotificationRecipientRow:
     attempts = sorted(r.delivery_attempts, key=lambda a: (a.channel.value, a.created_at))
+    user_full_name: str | None = None
+    user_email: str | None = None
+    if r.user is not None:
+        user_full_name = r.user.full_name
+        user_email = r.user.email
     return NotificationRecipientRow(
         id=r.id,
         user_id=r.user_id,
+        user_full_name=user_full_name,
+        user_email=user_email,
         status=r.status,
         read_at=r.read_at,
         created_at=r.created_at,
@@ -161,16 +169,11 @@ async def create_and_send_notification(
     admin: User,
     body: NotificationCreateRequest,
 ) -> NotificationDetailResponse:
-    if NotificationChannel.WHATSAPP in body.channels:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="WhatsApp delivery is not implemented yet. Remove whatsapp from channels.",
-        )
-
     channels_sorted = sorted(body.channels, key=lambda c: c.value)
     channel_values = [c.value for c in channels_sorted]
     in_app = NotificationChannel.IN_APP in body.channels
     sms_ch = NotificationChannel.SMS in body.channels
+    wa_ch = NotificationChannel.WHATSAPP in body.channels
 
     recipient_ids = await _resolve_recipient_user_ids(
         session,
@@ -200,11 +203,12 @@ async def create_and_send_notification(
     elif body.audience_type == NotificationAudienceType.EVENT_VOLUNTEERS:
         related_event_id = body.event_id
 
-    if sms_ch and not in_app:
+    external_needs_phone = (sms_ch or wa_ch) and not in_app
+    if external_needs_phone:
         if not any(sms_phone_from_user_profile(users_by_id[uid]) for uid in recipient_ids):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No recipients have a phone number on their app profile for SMS delivery.",
+                detail="No recipients have a phone number on their app profile for the selected external channel(s).",
             )
 
     if in_app:
@@ -236,8 +240,14 @@ async def create_and_send_notification(
     sms_attempted = 0
     sms_sent = 0
     sms_failed = 0
+    wa_skipped_no_phone = 0
+    wa_attempted = 0
+    wa_sent = 0
+    wa_failed = 0
     sms_payload = _sms_body_text(body.title, body.body)
+    wa_payload = _sms_body_text(body.title, body.body)
     pending_sms: list[tuple[NotificationDeliveryAttempt, str]] = []
+    pending_wa: list[tuple[NotificationDeliveryAttempt, str]] = []
 
     for uid in recipient_ids:
         u = users_by_id[uid]
@@ -286,6 +296,29 @@ async def create_and_send_notification(
                 await session.flush()
                 pending_sms.append((att, phone))
 
+        if wa_ch:
+            wa_phone = sms_phone_from_user_profile(u)
+            if not wa_phone:
+                wa_skipped_no_phone += 1
+                session.add(
+                    NotificationDeliveryAttempt(
+                        notification_recipient_id=rec.id,
+                        channel=NotificationChannel.WHATSAPP,
+                        status=NotificationDeliveryAttemptStatus.FAILED,
+                        error_detail="No phone number on app profile",
+                    )
+                )
+            else:
+                wa_attempted += 1
+                wa_att = NotificationDeliveryAttempt(
+                    notification_recipient_id=rec.id,
+                    channel=NotificationChannel.WHATSAPP,
+                    status=NotificationDeliveryAttemptStatus.PENDING,
+                )
+                session.add(wa_att)
+                await session.flush()
+                pending_wa.append((wa_att, wa_phone))
+
     for att, phone in pending_sms:
         result = await send_sms_twilio(to_e164=phone, body=sms_payload)
         if result.ok:
@@ -297,6 +330,17 @@ async def create_and_send_notification(
             att.error_detail = result.error_message
             sms_failed += 1
 
+    for att, phone in pending_wa:
+        result = await send_whatsapp_twilio(to_e164=phone, body=wa_payload)
+        if result.ok:
+            att.status = NotificationDeliveryAttemptStatus.SENT
+            att.provider_message_id = result.provider_message_id
+            wa_sent += 1
+        else:
+            att.status = NotificationDeliveryAttemptStatus.FAILED
+            att.error_detail = result.error_message
+            wa_failed += 1
+
     await session.commit()
 
     summary = DeliverySummary(
@@ -307,12 +351,17 @@ async def create_and_send_notification(
         sms_attempted=sms_attempted,
         sms_sent=sms_sent,
         sms_failed=sms_failed,
+        whatsapp_skipped_no_phone=wa_skipped_no_phone,
+        whatsapp_attempted=wa_attempted,
+        whatsapp_sent=wa_sent,
+        whatsapp_failed=wa_failed,
     )
 
     stmt = (
         select(Notification)
         .where(Notification.id == n.id)
         .options(
+            selectinload(Notification.recipients).selectinload(NotificationRecipient.user),
             selectinload(Notification.recipients).selectinload(
                 NotificationRecipient.delivery_attempts,
             ),
@@ -359,6 +408,29 @@ async def _build_summary_from_notification(
         if a.status == NotificationDeliveryAttemptStatus.FAILED
         and not (a.error_detail or "").startswith("No phone number")
     )
+    wa_all = [a for a in attempts if a.channel == NotificationChannel.WHATSAPP]
+    wa_skipped = sum(
+        1
+        for a in wa_all
+        if a.status == NotificationDeliveryAttemptStatus.FAILED
+        and (a.error_detail or "").startswith("No phone number")
+    )
+    wa_attempted = len(wa_all) - wa_skipped
+    wa_sent = sum(
+        1
+        for a in wa_all
+        if a.status
+        in (
+            NotificationDeliveryAttemptStatus.SENT,
+            NotificationDeliveryAttemptStatus.DELIVERED,
+        )
+    )
+    wa_failed = sum(
+        1
+        for a in wa_all
+        if a.status == NotificationDeliveryAttemptStatus.FAILED
+        and not (a.error_detail or "").startswith("No phone number")
+    )
     return DeliverySummary(
         audience_resolved_count=len(n.recipients),
         channels=channel_values,
@@ -367,6 +439,10 @@ async def _build_summary_from_notification(
         sms_attempted=sms_attempted,
         sms_sent=sms_sent,
         sms_failed=sms_failed,
+        whatsapp_skipped_no_phone=wa_skipped,
+        whatsapp_attempted=wa_attempted,
+        whatsapp_sent=wa_sent,
+        whatsapp_failed=wa_failed,
     )
 
 
@@ -437,6 +513,7 @@ async def get_notification_admin(
         select(Notification)
         .where(Notification.id == notification_id)
         .options(
+            selectinload(Notification.recipients).selectinload(NotificationRecipient.user),
             selectinload(Notification.recipients).selectinload(
                 NotificationRecipient.delivery_attempts,
             ),

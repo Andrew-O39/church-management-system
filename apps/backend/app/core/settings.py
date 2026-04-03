@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     SMS_AUTH_TOKEN: str | None = None
     SMS_FROM_NUMBER: str | None = None
 
+    # ---- WhatsApp (Twilio WhatsApp API; optional; uses profile phone as E.164) ----
+    WHATSAPP_PROVIDER: str | None = None  # e.g. "twilio"
+    WHATSAPP_ACCOUNT_SID: str | None = None  # defaults to SMS_ACCOUNT_SID when unset
+    WHATSAPP_AUTH_TOKEN: str | None = None  # defaults to SMS_AUTH_TOKEN when unset
+    # E.g. whatsapp:+14155238886 (Twilio sandbox / approved sender)
+    WHATSAPP_FROM_NUMBER: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

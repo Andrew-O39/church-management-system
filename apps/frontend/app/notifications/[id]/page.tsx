@@ -12,6 +12,8 @@ import { useAuth } from "components/providers/AuthProvider";
 import type { NotificationDetailResponse } from "lib/types";
 
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import DeliverySummaryContent from "components/notifications/DeliverySummaryContent";
+import RecipientIdentity from "components/notifications/RecipientIdentity";
 
 function formatDateTime(v: string | null) {
   if (!v) return "—";
@@ -128,24 +130,9 @@ export default function NotificationDetailPage() {
           {detail.delivery_summary ? (
             <ContentCard>
               <h3 className="text-base font-semibold text-slate-900">Delivery summary</h3>
-              <dl className="mt-2 grid gap-2 text-sm text-slate-600">
-                <div>
-                  <dt className="font-medium text-slate-700">Audience resolved</dt>
-                  <dd>{detail.delivery_summary.audience_resolved_count}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-slate-700">In-app recipients</dt>
-                  <dd>{detail.delivery_summary.in_app_recipient_count}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-slate-700">SMS</dt>
-                  <dd>
-                    attempted {detail.delivery_summary.sms_attempted}, sent{" "}
-                    {detail.delivery_summary.sms_sent}, failed {detail.delivery_summary.sms_failed}, skipped
-                    (no phone) {detail.delivery_summary.sms_skipped_no_phone}
-                  </dd>
-                </div>
-              </dl>
+              <div className="mt-3">
+                <DeliverySummaryContent summary={detail.delivery_summary} />
+              </div>
             </ContentCard>
           ) : null}
           <ContentCard>
@@ -155,9 +142,9 @@ export default function NotificationDetailPage() {
             <ul className="mt-3 divide-y divide-slate-100">
               {detail.recipients.map((r) => (
                 <li key={r.id} className="py-3 text-sm">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <span className="font-mono text-xs text-slate-700">{r.user_id}</span>
-                    <span className="text-slate-500">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <RecipientIdentity recipient={r} />
+                    <span className="shrink-0 text-slate-500">
                       {r.status}
                       {r.read_at ? ` · read ${formatDateTime(r.read_at)}` : ""}
                     </span>

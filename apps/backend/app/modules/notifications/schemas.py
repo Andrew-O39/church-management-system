@@ -77,6 +77,8 @@ class DeliveryAttemptRow(BaseModel):
 class NotificationRecipientRow(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+    user_full_name: str | None = None
+    user_email: str | None = None
     status: NotificationRecipientStatus
     read_at: datetime | None
     created_at: datetime
@@ -92,6 +94,10 @@ class DeliverySummary(BaseModel):
     sms_attempted: int
     sms_sent: int
     sms_failed: int
+    whatsapp_skipped_no_phone: int
+    whatsapp_attempted: int
+    whatsapp_sent: int
+    whatsapp_failed: int
 
 
 class NotificationListItem(BaseModel):

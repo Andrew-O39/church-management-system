@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.db.models.enums import UserRole
 from app.modules.auth import service as auth_service
-from app.modules.notifications.providers.base import SMSDeliveryResult
+from app.modules.notifications.providers.base import SMSDeliveryResult, WhatsAppDeliveryResult
 
 
 async def _promote_to_admin(session_factory: async_sessionmaker, email: str) -> None:
@@ -137,6 +137,24 @@ def mock_sms_fail(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.modules.notifications.service.send_sms_twilio", _send)
 
 
+@pytest.fixture
+def mock_whatsapp_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _send(*, to_e164: str, body: str) -> WhatsAppDeliveryResult:
+        _ = body
+        return WhatsAppDeliveryResult(ok=True, provider_message_id=f"WM_{to_e164[-4:]}")
+
+    monkeypatch.setattr("app.modules.notifications.service.send_whatsapp_twilio", _send)
+
+
+@pytest.fixture
+def mock_whatsapp_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _send(*, to_e164: str, body: str) -> WhatsAppDeliveryResult:
+        _ = (to_e164, body)
+        return WhatsAppDeliveryResult(ok=False, error_message="whatsapp provider rejected")
+
+    monkeypatch.setattr("app.modules.notifications.service.send_whatsapp_twilio", _send)
+
+
 @pytest.mark.asyncio
 async def test_direct_user_notification_send(
     client: AsyncClient,
@@ -159,6 +177,8 @@ async def test_direct_user_notification_send(
     assert body["body"] == "Test body"
     assert len(body["recipients"]) == 1
     assert body["recipients"][0]["user_id"] == uid
+    assert body["recipients"][0]["user_full_name"] == "Member"
+    assert body["recipients"][0]["user_email"] == "dir1@example.com"
     assert body["channels"] == ["in_app"]
     assert len(body["recipients"][0]["delivery_attempts"]) == 1
     assert body["recipients"][0]["delivery_attempts"][0]["channel"] == "in_app"
@@ -561,21 +581,219 @@ async def test_in_app_and_sms_partial_no_phone_skipped(
 
 
 @pytest.mark.asyncio
-async def test_whatsapp_not_implemented(
+async def test_whatsapp_direct_users(
+    mock_whatsapp_ok: None,
     client: AsyncClient,
     session_factory: async_sessionmaker,
 ) -> None:
-    m = await _register(client, "wa@example.com")
+    m = await _register(client, "wadir@example.com")
     uid = m["user"]["id"]
-    await _register(client, "adm_wa@example.com")
-    await _promote_to_admin(session_factory, "adm_wa@example.com")
-    adm_tok = await _login(client, "adm_wa@example.com")
+    mem_tok = await _login(client, "wadir@example.com")
+    await _set_profile_phone(client, mem_tok, "+15551230001")
+    await _register(client, "adm_wa1@example.com")
+    await _promote_to_admin(session_factory, "adm_wa1@example.com")
+    adm_tok = await _login(client, "adm_wa1@example.com")
+
     r = await client.post(
         "/api/v1/notifications/",
         headers={"Authorization": f"Bearer {adm_tok}"},
         json=_notif_payload_direct([uid], channels=["whatsapp"]),
     )
-    assert r.status_code == 501, r.text
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["channels"] == ["whatsapp"]
+    assert body["delivery_summary"]["whatsapp_sent"] == 1
+    wa_att = [a for a in body["recipients"][0]["delivery_attempts"] if a["channel"] == "whatsapp"]
+    assert len(wa_att) == 1
+    assert wa_att[0]["status"] == "sent"
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_ministry_members(
+    mock_whatsapp_ok: None,
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "wamin@example.com")
+    uid = m["user"]["id"]
+    mem_tok = await _login(client, "wamin@example.com")
+    await _set_profile_phone(client, mem_tok, "+15551230002")
+    await _register(client, "adm_wamin@example.com")
+    await _promote_to_admin(session_factory, "adm_wamin@example.com")
+    adm_tok = await _login(client, "adm_wamin@example.com")
+    ministry = await _create_ministry(client, adm_tok, "WA Ministry")
+    mid = ministry["id"]
+    await _add_ministry_member(client, adm_tok, mid, uid)
+
+    r = await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json={
+            "title": "M",
+            "body": "B",
+            "category": "ministry",
+            "channels": ["whatsapp"],
+            "audience_type": "ministry_members",
+            "ministry_id": mid,
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["delivery_summary"]["whatsapp_sent"] == 1
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_event_volunteers(
+    mock_whatsapp_ok: None,
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "wavol@example.com")
+    uid = m["user"]["id"]
+    mem_tok = await _login(client, "wavol@example.com")
+    await _set_profile_phone(client, mem_tok, "+15551230003")
+    await _register(client, "adm_wavol@example.com")
+    await _promote_to_admin(session_factory, "adm_wavol@example.com")
+    adm_tok = await _login(client, "adm_wavol@example.com")
+    event = await _create_event(client, adm_tok)
+    eid = event["event_id"]
+    role = await _create_role(client, adm_tok)
+    await client.post(
+        f"/api/v1/events/{eid}/volunteers",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json={"user_id": uid, "role_id": role["id"]},
+    )
+    r = await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json={
+            "title": "V",
+            "body": "B",
+            "category": "volunteer",
+            "channels": ["whatsapp"],
+            "audience_type": "event_volunteers",
+            "event_id": eid,
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["delivery_summary"]["whatsapp_sent"] == 1
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_only_all_missing_phone_rejected(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "nowa@example.com")
+    uid = m["user"]["id"]
+    await _register(client, "adm_nowa@example.com")
+    await _promote_to_admin(session_factory, "adm_nowa@example.com")
+    adm_tok = await _login(client, "adm_nowa@example.com")
+
+    r = await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json=_notif_payload_direct([uid], channels=["whatsapp"]),
+    )
+    assert r.status_code == 400, r.text
+
+
+@pytest.mark.asyncio
+async def test_in_app_and_whatsapp_partial_no_phone_skipped(
+    mock_whatsapp_ok: None,
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "wapart@example.com")
+    uid = m["user"]["id"]
+    await _register(client, "adm_wapart@example.com")
+    await _promote_to_admin(session_factory, "adm_wapart@example.com")
+    adm_tok = await _login(client, "adm_wapart@example.com")
+
+    r = await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json=_notif_payload_direct([uid], channels=["in_app", "whatsapp"]),
+    )
+    assert r.status_code == 201, r.text
+    summary = r.json()["delivery_summary"]
+    assert summary["whatsapp_skipped_no_phone"] == 1
+    assert summary["whatsapp_sent"] == 0
+    assert summary["in_app_recipient_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_provider_failure_recorded(
+    mock_whatsapp_fail: None,
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "wafail@example.com")
+    uid = m["user"]["id"]
+    mem_tok = await _login(client, "wafail@example.com")
+    await _set_profile_phone(client, mem_tok, "+15551230004")
+    await _register(client, "adm_wafail@example.com")
+    await _promote_to_admin(session_factory, "adm_wafail@example.com")
+    adm_tok = await _login(client, "adm_wafail@example.com")
+
+    r = await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json=_notif_payload_direct([uid], channels=["whatsapp"]),
+    )
+    assert r.status_code == 201, r.text
+    summary = r.json()["delivery_summary"]
+    assert summary["whatsapp_failed"] == 1
+    assert summary["whatsapp_sent"] == 0
+    wa_att = [
+        a
+        for a in r.json()["recipients"][0]["delivery_attempts"]
+        if a["channel"] == "whatsapp"
+    ]
+    assert wa_att[0]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_in_app_and_whatsapp_inbox_lists_notification(
+    mock_whatsapp_ok: None,
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "wainbox@example.com")
+    uid = m["user"]["id"]
+    mem_tok = await _login(client, "wainbox@example.com")
+    await _set_profile_phone(client, mem_tok, "+15551230005")
+    await _register(client, "adm_wainbox@example.com")
+    await _promote_to_admin(session_factory, "adm_wainbox@example.com")
+    adm_tok = await _login(client, "adm_wainbox@example.com")
+
+    await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {adm_tok}"},
+        json=_notif_payload_direct([uid], channels=["in_app", "whatsapp"]),
+    )
+    me = await client.get(
+        "/api/v1/notifications/me",
+        headers={"Authorization": f"Bearer {mem_tok}"},
+    )
+    assert me.status_code == 200
+    assert len(me.json()["items"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_non_admin_cannot_send_whatsapp_notifications(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    m = await _register(client, "mem_wa403@example.com")
+    uid = m["user"]["id"]
+    tok = await _login(client, "mem_wa403@example.com")
+
+    r = await client.post(
+        "/api/v1/notifications/",
+        headers={"Authorization": f"Bearer {tok}"},
+        json=_notif_payload_direct([uid], channels=["whatsapp"]),
+    )
+    assert r.status_code == 403, r.text
 
 
 @pytest.mark.asyncio
