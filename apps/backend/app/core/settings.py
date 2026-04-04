@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     # E.g. whatsapp:+14155238886 (Twilio sandbox / approved sender)
     WHATSAPP_FROM_NUMBER: str | None = None
 
+    # ---- Event reminders (Step 14) ----
+    REMINDER_JOB_BATCH_SIZE: int = 500
+    # Polling interval for the dedicated `reminder-scheduler` process (seconds).
+    REMINDER_JOB_INTERVAL_SECONDS: int = 60
+    # When false, `poetry run reminder-scheduler` exits immediately (API + manual trigger still work).
+    REMINDER_SCHEDULER_ENABLED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

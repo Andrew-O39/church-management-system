@@ -21,6 +21,7 @@ import type {
   NotificationListResponse,
   NotificationAudienceType,
   NotificationCategory,
+  RunDueRemindersResponse,
   UserSearchItem,
   UserSearchResponse,
 } from "lib/types";
@@ -40,10 +41,13 @@ const CATEGORY_OPTIONS: NotificationCategory[] = [
 ];
 
 const AUDIENCE_OPTIONS: { value: NotificationAudienceType; label: string }[] = [
-  { value: "direct_users", label: "Specific app users (search & select)" },
-  { value: "ministry_members", label: "All active members of a ministry" },
-  { value: "event_volunteers", label: "Volunteers assigned to an event" },
+  { value: "direct_users", label: "Specific people (search and add)" },
+  { value: "ministry_members", label: "Everyone in a ministry" },
+  { value: "event_volunteers", label: "Volunteers for an event" },
 ];
+
+/** Inbox list refresh interval (ms); keep in sync with helper copy below. */
+const INBOX_REFRESH_MS = 20_000;
 
 function formatDateTime(v: string | null) {
   if (!v) return "—";
@@ -88,6 +92,8 @@ export default function NotificationsPage() {
   const [channelSms, setChannelSms] = useState(false);
   const [channelWhatsapp, setChannelWhatsapp] = useState(false);
   const [lastSendSummary, setLastSendSummary] = useState<DeliverySummary | null>(null);
+  const [runDueBusy, setRunDueBusy] = useState(false);
+  const [runDueSummary, setRunDueSummary] = useState<RunDueRemindersResponse | null>(null);
 
   const [userSearchInput, setUserSearchInput] = useState("");
   const [debouncedUserSearch, setDebouncedUserSearch] = useState("");
@@ -211,6 +217,17 @@ export default function NotificationsPage() {
     void load();
   }, [load]);
 
+  /** Refresh inbox periodically so new messages appear without a full page reload. */
+  useEffect(() => {
+    if (!token || status !== "authenticated") return;
+    const id = window.setInterval(() => {
+      void loadInbox().then(() => {
+        window.dispatchEvent(new Event("notifications:updated"));
+      });
+    }, INBOX_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [token, status, loadInbox]);
+
   const onMarkRead = async (notificationId: string) => {
     if (!token) return;
     try {
@@ -248,7 +265,7 @@ export default function NotificationsPage() {
       return;
     }
     if (audienceType === "direct_users" && selectedDirectUsers.length === 0) {
-      setError("Select at least one app user to notify.");
+      setError("Select at least one person to notify.");
       return;
     }
     setSending(true);
@@ -297,6 +314,27 @@ export default function NotificationsPage() {
   const inboxPages = Math.max(1, Math.ceil(inboxTotal / inboxPageSize));
   const sentPages = Math.max(1, Math.ceil(sentTotal / sentPageSize));
 
+  async function onRunDueReminders() {
+    if (!token || !isAdmin) return;
+    setRunDueBusy(true);
+    setRunDueSummary(null);
+    setError(null);
+    try {
+      const res = await apiFetch<RunDueRemindersResponse>("/api/v1/notifications/jobs/run-reminders", {
+        method: "POST",
+        token,
+      });
+      setRunDueSummary(res);
+      await loadAdmin();
+      await loadInbox();
+      window.dispatchEvent(new Event("notifications:updated"));
+    } catch (e: unknown) {
+      setError(toErrorMessage(e));
+    } finally {
+      setRunDueBusy(false);
+    }
+  }
+
   if (!token || status !== "authenticated") {
     return (
       <PageShell title="Notifications" description="Sign in to view notifications.">
@@ -310,8 +348,8 @@ export default function NotificationsPage() {
       title="Notifications"
       description={
         isAdmin
-          ? "Send messages to app users (in-app, SMS, WhatsApp). Parish registry records are never messaged."
-          : "In-app messages sent to your account."
+          ? "Send messages to app users by in-app notification, SMS, or WhatsApp."
+          : "Messages sent to your account in the app."
       }
     >
       {error ? (
@@ -321,12 +359,45 @@ export default function NotificationsPage() {
       ) : null}
 
       {isAdmin ? (
+        <ContentCard className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Event reminders</h2>
+          <p className="text-sm text-slate-600">
+            Runs any reminder messages that are currently due (based on the reminders you set up on each
+            event). Use this if you want to send them right away instead of waiting for the next automatic run.
+          </p>
+          <button
+            type="button"
+            onClick={() => void onRunDueReminders()}
+            disabled={runDueBusy}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            {runDueBusy ? "Running…" : "Run due reminders now"}
+          </button>
+          {runDueSummary ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800">
+              <p>
+                Reminders sent: {runDueSummary.reminders_sent} · Not due yet: {runDueSummary.skipped_not_due} ·
+                Already sent: {runDueSummary.skipped_already_sent} · Couldn&apos;t send:{" "}
+                {runDueSummary.skipped_invalid + runDueSummary.failed}
+              </p>
+              {runDueSummary.failure_messages.length > 0 ? (
+                <ul className="mt-2 list-inside list-disc text-red-800">
+                  {runDueSummary.failure_messages.slice(0, 8).map((m, i) => (
+                    <li key={i}>{m}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </ContentCard>
+      ) : null}
+
+      {isAdmin ? (
         <ContentCard>
           <h2 className="text-lg font-semibold text-slate-900">Send notification</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Recipients are app users only. SMS and WhatsApp use the phone number on each user&apos;s app
-            profile (not the parish registry). Twilio WhatsApp session messages require configured env
-            vars and an approved/sandbox sender.
+            Messages go to people who use this app. SMS and WhatsApp are sent using the phone number saved on
+            each user&apos;s app profile.
           </p>
           {lastSendSummary ? (
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-emerald-950">
@@ -372,7 +443,7 @@ export default function NotificationsPage() {
             </div>
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium text-slate-700">Delivery channels</legend>
-              <p className="text-xs text-slate-500">Choose one or more. External channels need Twilio env configuration.</p>
+              <p className="text-xs text-slate-500">Choose how you want this message delivered. You can select more than one.</p>
               <label className="flex items-center gap-2 text-sm text-slate-800">
                 <input
                   type="checkbox"
@@ -380,7 +451,7 @@ export default function NotificationsPage() {
                   onChange={(e) => setChannelInApp(e.target.checked)}
                   className="rounded border-slate-300"
                 />
-                In-app (inbox + unread badge)
+                In-app (shows in each person&apos;s inbox)
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-800">
                 <input
@@ -389,7 +460,7 @@ export default function NotificationsPage() {
                   onChange={(e) => setChannelSms(e.target.checked)}
                   className="rounded border-slate-300"
                 />
-                SMS (Twilio)
+                SMS
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-800">
                 <input
@@ -398,7 +469,7 @@ export default function NotificationsPage() {
                   onChange={(e) => setChannelWhatsapp(e.target.checked)}
                   className="rounded border-slate-300"
                 />
-                WhatsApp (Twilio WhatsApp API; session messages / sandbox)
+                WhatsApp
               </label>
             </fieldset>
             <div>
@@ -419,10 +490,10 @@ export default function NotificationsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="user-search">
-                    Find app users
+                    Find people
                   </label>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Search by name, email, or phone. Type at least two characters.
+                    Search by name, email, or phone number. Enter at least two characters.
                   </p>
                   <input
                     id="user-search"
@@ -560,14 +631,14 @@ export default function NotificationsPage() {
             audienceType === "direct_users" &&
             selectedDirectUsers.some((u) => !u.phone_number?.trim()) ? (
               <p className="text-sm text-amber-800">
-                Some selected users have no phone on their app profile — SMS/WhatsApp will be skipped for
-                them (in-app delivery still applies if enabled).
+                Some selected people don&apos;t have a phone number on their profile. SMS and WhatsApp can&apos;t
+                be sent to them; in-app still works if you turn it on above.
               </p>
             ) : null}
             {(channelSms || channelWhatsapp) && audienceType !== "direct_users" ? (
               <p className="text-sm text-amber-800">
-                SMS and WhatsApp use each member&apos;s app profile phone only. Users without a number are
-                skipped for those channels; enable in-app if everyone should see the message.
+                SMS and WhatsApp use the phone number saved on each person&apos;s app profile. Anyone without a
+                number won&apos;t get those channels—use in-app if everyone should see the message.
               </p>
             ) : null}
             <button
@@ -587,7 +658,13 @@ export default function NotificationsPage() {
 
       <ContentCard>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900">Your inbox</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Your inbox</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Refreshes about every {INBOX_REFRESH_MS / 1000} seconds so new messages appear without reloading
+              the page.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => void onMarkAllRead()}

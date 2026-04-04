@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.db.models.enums import EventType, EventVisibility
 
 if TYPE_CHECKING:
+    from app.db.models.event_reminder_rule import EventReminderRule
     from app.db.models.ministry_group import MinistryGroup
     from app.db.models.user import User
 
@@ -80,6 +81,10 @@ class ChurchEvent(Base):
     ministry: Mapped["MinistryGroup | None"] = relationship(
         foreign_keys=[ministry_id],
         lazy="selectin",
+    )
+    reminder_rules: Mapped[list["EventReminderRule"]] = relationship(
+        back_populates="event",
+        cascade="all, delete-orphan",
     )
     created_by: Mapped["User | None"] = relationship(
         foreign_keys=[created_by_user_id],

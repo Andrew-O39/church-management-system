@@ -612,3 +612,54 @@ export type NotificationCreateRequest = {
   event_id?: string;
 };
 
+// --- Event reminders (Step 14) ---
+
+export type EventReminderAudienceType = "event_volunteers" | "ministry_members";
+
+export type EventReminderRuleResponse = {
+  id: string;
+  event_id: string;
+  title_override: string | null;
+  body_override: string | null;
+  audience_type: EventReminderAudienceType;
+  channels: string[];
+  offset_minutes_before: number;
+  is_active: boolean;
+  last_run_at: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventReminderRuleListResponse = {
+  items: EventReminderRuleResponse[];
+};
+
+export type EventReminderRuleCreate = {
+  audience_type: EventReminderAudienceType;
+  channels: NotificationChannel[];
+  offset_minutes_before: number;
+  title_override?: string | null;
+  body_override?: string | null;
+  is_active?: boolean;
+};
+
+export type EventReminderRulePatch = {
+  audience_type?: EventReminderAudienceType;
+  channels?: NotificationChannel[];
+  offset_minutes_before?: number;
+  title_override?: string | null;
+  body_override?: string | null;
+  is_active?: boolean;
+};
+
+export type RunDueRemindersResponse = {
+  rules_considered: number;
+  reminders_sent: number;
+  skipped_not_due: number;
+  skipped_already_sent: number;
+  skipped_invalid: number;
+  failed: number;
+  failure_messages: string[];
+};
+

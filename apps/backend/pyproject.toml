@@ -1,5 +1,6 @@
 [tool.poetry.scripts]
 bootstrap-admin = "app.cli.bootstrap_admin:main"
+reminder-scheduler = "app.cli.reminder_scheduler:main"
 
 [tool.poetry]
 name = "church-management-backend"

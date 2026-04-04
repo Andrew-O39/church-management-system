@@ -105,3 +105,19 @@ class NotificationDeliveryAttemptStatus(str, enum.Enum):
     SENT = "sent"
     DELIVERED = "delivered"
     FAILED = "failed"
+
+
+class EventReminderAudienceType(str, enum.Enum):
+    """Who receives an automated event reminder (app users only)."""
+
+    EVENT_VOLUNTEERS = "event_volunteers"
+    MINISTRY_MEMBERS = "ministry_members"
+
+
+class EventReminderRunStatus(str, enum.Enum):
+    """Lifecycle for one scheduled fire of a reminder rule."""
+
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"

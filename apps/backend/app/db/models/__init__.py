@@ -12,6 +12,8 @@ from app.db.models.volunteer_role import VolunteerRole
 from app.db.models.notification import Notification
 from app.db.models.notification_delivery_attempt import NotificationDeliveryAttempt
 from app.db.models.notification_recipient import NotificationRecipient
+from app.db.models.event_reminder_rule import EventReminderRule
+from app.db.models.event_reminder_run import EventReminderRun
 
 __all__ = [
     "User",
@@ -26,4 +28,6 @@ __all__ = [
     "Notification",
     "NotificationDeliveryAttempt",
     "NotificationRecipient",
+    "EventReminderRule",
+    "EventReminderRun",
 ]

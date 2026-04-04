@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,8 @@ from app.db.models.enums import NotificationCategory, NotificationChannel, UserR
 from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
+from app.modules.event_reminders.schemas import RunDueRemindersResponse
+from app.modules.event_reminders import service as event_reminders_service
 from app.modules.notifications import service as notifications_service
 from app.modules.notifications.schemas import (
     MarkAllReadResponse,
@@ -24,6 +28,19 @@ from app.modules.notifications.schemas import (
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 _MAX_PAGE_SIZE = 100
+
+
+@router.post("/jobs/run-reminders", response_model=RunDueRemindersResponse)
+async def run_due_reminders_job(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    as_of: datetime | None = Query(
+        default=None,
+        description="Simulate wall-clock time (UTC) for tests and manual verification; omit in production cron.",
+    ),
+) -> RunDueRemindersResponse:
+    """Process due event reminder rules (manual trigger for dev/ops; same entrypoint as future cron)."""
+    return await event_reminders_service.run_due_reminders(session, now=as_of)
 
 
 @router.get("/me/unread-count", response_model=UnreadCountResponse)

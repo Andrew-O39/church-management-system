@@ -168,6 +168,7 @@ async def create_and_send_notification(
     *,
     admin: User,
     body: NotificationCreateRequest,
+    commit: bool = True,
 ) -> NotificationDetailResponse:
     channels_sorted = sorted(body.channels, key=lambda c: c.value)
     channel_values = [c.value for c in channels_sorted]
@@ -341,7 +342,10 @@ async def create_and_send_notification(
             att.error_detail = result.error_message
             wa_failed += 1
 
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
 
     summary = DeliverySummary(
         audience_resolved_count=len(recipient_ids),

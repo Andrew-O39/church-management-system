@@ -34,6 +34,25 @@ services:
       postgres:
         condition: service_healthy
 
+  # Dedicated process: same due-reminder job as POST /api/v1/notifications/jobs/run-reminders
+  reminder_scheduler:
+    build:
+      context: ./apps/backend
+    restart: unless-stopped
+    command: ["poetry", "run", "reminder-scheduler"]
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      PYTHONPATH: /app
+      REMINDER_JOB_INTERVAL_SECONDS: ${REMINDER_JOB_INTERVAL_SECONDS:-60}
+      REMINDER_SCHEDULER_ENABLED: ${REMINDER_SCHEDULER_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./apps/frontend

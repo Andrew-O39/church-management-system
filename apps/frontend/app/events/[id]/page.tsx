@@ -23,12 +23,18 @@ import type {
   EventAttendanceListResponse,
   EventDetailResponse,
   EventMemberViewResponse,
+  EventReminderAudienceType,
+  EventReminderRuleCreate,
+  EventReminderRuleListResponse,
+  EventReminderRuleResponse,
   EventType,
   EventVisibility,
   EventVolunteerListResponse,
   MyAttendanceResponse,
   MyEventVolunteerAssignmentsResponse,
   MinistryListResponse,
+  NotificationChannel,
+  RunDueRemindersResponse,
   VolunteerAssignmentRow,
   VolunteerRoleListResponse,
 } from "lib/types";
@@ -57,6 +63,13 @@ function formatDateTime(v: string) {
   const d = new Date(v);
   if (isNaN(d.getTime())) return v;
   return d.toLocaleString();
+}
+
+function formatReminderOffset(m: number): string {
+  if (m === 60) return "1 hour before";
+  if (m === 1440) return "24 hours before";
+  if (m === 10080) return "7 days before";
+  return `${m} minutes before`;
 }
 
 export default function EventDetailPage({ params }: { params: { id: string } }) {
@@ -90,6 +103,18 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const [volNotesError, setVolNotesError] = useState<Record<string, string>>({});
 
   const [myVolunteers, setMyVolunteers] = useState<VolunteerAssignmentRow[]>([]);
+
+  const [reminderRules, setReminderRules] = useState<EventReminderRuleResponse[]>([]);
+  const [reminderAudience, setReminderAudience] = useState<EventReminderAudienceType>("event_volunteers");
+  const [remOffsetChoice, setRemOffsetChoice] = useState<string>("60");
+  const [remCustomOffset, setRemCustomOffset] = useState("120");
+  const [remInApp, setRemInApp] = useState(true);
+  const [remSms, setRemSms] = useState(false);
+  const [remWa, setRemWa] = useState(false);
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderSectionError, setReminderSectionError] = useState<string | null>(null);
+  const [runDueBusy, setRunDueBusy] = useState(false);
+  const [runDueSummary, setRunDueSummary] = useState<RunDueRemindersResponse | null>(null);
 
   // Admin edit state
   const [editTitle, setEditTitle] = useState("");
@@ -173,6 +198,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           notesInit[r.id] = r.notes ?? "";
         });
         setVolNotesDraft(notesInit);
+
+        const rem = await apiFetch<EventReminderRuleListResponse>(`/api/v1/events/${eventId}/reminders`, {
+          method: "GET",
+          token,
+        });
+        setReminderRules(rem.items);
       } else {
         const d = await apiFetch<EventMemberViewResponse>(`/api/v1/events/${eventId}/view`, {
           method: "GET",
@@ -435,6 +466,109 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
     }
   }
 
+  async function onCreateReminder(e: FormEvent) {
+    e.preventDefault();
+    if (!token || !isAdmin || !detail || !("event_id" in detail)) return;
+    if (!remInApp && !remSms && !remWa) {
+      setReminderSectionError("Select at least one channel.");
+      return;
+    }
+    const offset =
+      remOffsetChoice === "custom"
+        ? Number.parseInt(remCustomOffset, 10)
+        : Number.parseInt(remOffsetChoice, 10);
+    if (!Number.isFinite(offset) || offset <= 0) {
+      setReminderSectionError("Enter a valid offset in minutes.");
+      return;
+    }
+    if (reminderAudience === "ministry_members" && !detail.ministry_id) {
+      setReminderSectionError("Link this event to a ministry first, or choose event volunteers.");
+      return;
+    }
+    const channels: NotificationChannel[] = [];
+    if (remInApp) channels.push("in_app");
+    if (remSms) channels.push("sms");
+    if (remWa) channels.push("whatsapp");
+    setReminderSaving(true);
+    setReminderSectionError(null);
+    try {
+      const body: EventReminderRuleCreate = {
+        audience_type: reminderAudience,
+        channels,
+        offset_minutes_before: offset,
+      };
+      await apiFetch(`/api/v1/events/${eventId}/reminders`, {
+        method: "POST",
+        token,
+        body,
+      });
+      const rem = await apiFetch<EventReminderRuleListResponse>(`/api/v1/events/${eventId}/reminders`, {
+        method: "GET",
+        token,
+      });
+      setReminderRules(rem.items);
+    } catch (err) {
+      setReminderSectionError(toErrorMessage(err));
+    } finally {
+      setReminderSaving(false);
+    }
+  }
+
+  async function onToggleReminderActive(r: EventReminderRuleResponse) {
+    if (!token || !isAdmin) return;
+    setReminderSectionError(null);
+    try {
+      await apiFetch(`/api/v1/events/${eventId}/reminders/${r.id}`, {
+        method: "PATCH",
+        token,
+        body: { is_active: !r.is_active },
+      });
+      const rem = await apiFetch<EventReminderRuleListResponse>(`/api/v1/events/${eventId}/reminders`, {
+        method: "GET",
+        token,
+      });
+      setReminderRules(rem.items);
+    } catch (err) {
+      setReminderSectionError(toErrorMessage(err));
+    }
+  }
+
+  async function onDeleteReminderRule(ruleId: string) {
+    if (!token || !isAdmin) return;
+    if (!window.confirm("Delete this reminder rule?")) return;
+    setReminderSectionError(null);
+    try {
+      await apiFetch(`/api/v1/events/${eventId}/reminders/${ruleId}`, { method: "DELETE", token });
+      setReminderRules((prev) => prev.filter((x) => x.id !== ruleId));
+    } catch (err) {
+      setReminderSectionError(toErrorMessage(err));
+    }
+  }
+
+  async function onRunDueRemindersHere() {
+    if (!token || !isAdmin) return;
+    setRunDueBusy(true);
+    setRunDueSummary(null);
+    setReminderSectionError(null);
+    try {
+      const res = await apiFetch<RunDueRemindersResponse>("/api/v1/notifications/jobs/run-reminders", {
+        method: "POST",
+        token,
+      });
+      setRunDueSummary(res);
+      const rem = await apiFetch<EventReminderRuleListResponse>(`/api/v1/events/${eventId}/reminders`, {
+        method: "GET",
+        token,
+      });
+      setReminderRules(rem.items);
+      window.dispatchEvent(new Event("notifications:updated"));
+    } catch (err) {
+      setReminderSectionError(toErrorMessage(err));
+    } finally {
+      setRunDueBusy(false);
+    }
+  }
+
   const ministryLabel = useMemo(() => {
     if (!detail) return null;
     const minId = detail.ministry_id;
@@ -474,7 +608,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <PageShell title={detail.title} description="Event details">
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
           <Link href="/events" className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
             ← All events
@@ -574,72 +708,8 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               </div>
             </form>
           </ContentCard>
-          <ContentCard className="space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900">Attendance</h2>
-            {!detail.is_active ? (
-              <p className="text-sm text-amber-800">
-                Event is inactive. Attendance recording is disabled.
-              </p>
-            ) : null}
-            {eligibleChurchMembers.length === 0 ? (
-              <p className="text-sm text-slate-600">No eligible app users for this event.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2">Name</th>
-                      <th className="px-3 py-2">Email</th>
-                      <th className="px-3 py-2">Attendance status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {eligibleChurchMembers.map((u) => {
-                      const persisted = attendanceByUserId[u.id];
-                      const selectValue = persisted ?? "";
-                      const phase = attendanceRowPhase[u.id] ?? "idle";
-                      const rowErr = attendanceRowError[u.id];
-                      return (
-                        <tr key={u.id}>
-                          <td className="px-3 py-2">{u.full_name}</td>
-                          <td className="px-3 py-2 text-slate-700">{u.email ?? "—"}</td>
-                          <td className="px-3 py-2 align-top">
-                            <select
-                              value={selectValue}
-                              onChange={(e) => {
-                                void onAttendanceStatusChange(u.id, e.target.value);
-                              }}
-                              className={inputCls}
-                              disabled={!detail.is_active || phase === "saving"}
-                              aria-busy={phase === "saving"}
-                            >
-                              <option value="">Select status</option>
-                              {ATTENDANCE_OPTIONS.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </select>
-                            {phase === "saving" ? (
-                              <p className="mt-1 text-xs text-slate-600">Saving…</p>
-                            ) : null}
-                            {phase === "success" ? (
-                              <p className="mt-1 text-xs text-green-800">Saved</p>
-                            ) : null}
-                            {phase === "error" && rowErr ? (
-                              <p className="mt-1 text-xs text-red-800">{rowErr}</p>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ContentCard>
 
-          <ContentCard className="space-y-4">
+          <ContentCard className="space-y-4 border-t border-slate-100 pt-1">
             <h2 className="text-sm font-semibold text-slate-900">Volunteer scheduling</h2>
             {volunteerSectionError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -802,6 +872,232 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                         </td>
                       </tr>
                     );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ContentCard>
+
+          <ContentCard className="space-y-4 border-t border-slate-100 pt-1">
+            <h2 className="text-sm font-semibold text-slate-900">Event reminders</h2>
+            <div className="space-y-2 text-sm text-slate-600">
+              <p>Set up automatic messages to be sent before this event starts.</p>
+              <p>Choose when to send them and how they should be delivered.</p>
+              <p>
+                Use &quot;Run due reminders now&quot; to send any reminders that are currently due.
+              </p>
+            </div>
+            {reminderSectionError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {reminderSectionError}
+              </div>
+            ) : null}
+
+            <form onSubmit={onCreateReminder} className="space-y-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">New reminder</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Audience</label>
+                  <select
+                    value={reminderAudience}
+                    onChange={(e) => setReminderAudience(e.target.value as EventReminderAudienceType)}
+                    className={inputCls}
+                    disabled={!detail.is_active}
+                  >
+                    <option value="event_volunteers">Event volunteers</option>
+                    <option value="ministry_members" disabled={!detail.ministry_id}>
+                      Ministry members (linked ministry)
+                    </option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Send before start</label>
+                  <select
+                    value={remOffsetChoice}
+                    onChange={(e) => setRemOffsetChoice(e.target.value)}
+                    className={inputCls}
+                    disabled={!detail.is_active}
+                  >
+                    <option value="60">1 hour</option>
+                    <option value="1440">24 hours</option>
+                    <option value="10080">7 days</option>
+                    <option value="custom">Custom (minutes)</option>
+                  </select>
+                  {remOffsetChoice === "custom" ? (
+                    <input
+                      type="number"
+                      min={1}
+                      value={remCustomOffset}
+                      onChange={(e) => setRemCustomOffset(e.target.value)}
+                      className={inputCls + " mt-1"}
+                      disabled={!detail.is_active}
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <fieldset className="flex flex-wrap gap-3 text-sm text-slate-800">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={remInApp}
+                    onChange={(e) => setRemInApp(e.target.checked)}
+                    className="rounded border-slate-300"
+                    disabled={!detail.is_active}
+                  />
+                  In-app
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={remSms}
+                    onChange={(e) => setRemSms(e.target.checked)}
+                    className="rounded border-slate-300"
+                    disabled={!detail.is_active}
+                  />
+                  SMS
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={remWa}
+                    onChange={(e) => setRemWa(e.target.checked)}
+                    className="rounded border-slate-300"
+                    disabled={!detail.is_active}
+                  />
+                  WhatsApp
+                </label>
+              </fieldset>
+              <button
+                type="submit"
+                disabled={!detail.is_active || reminderSaving}
+                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+              >
+                {reminderSaving ? "Saving…" : "Add reminder"}
+              </button>
+            </form>
+
+            {reminderRules.length === 0 ? (
+              <p className="text-sm text-slate-600">No reminder rules yet.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                {reminderRules.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 px-3 py-3 text-sm">
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        {r.audience_type === "event_volunteers" ? "Event volunteers" : "Ministry members"} ·{" "}
+                        {formatReminderOffset(r.offset_minutes_before)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Channels: {r.channels.join(", ")} · {r.is_active ? "Active" : "Inactive"}
+                        {r.last_run_at ? ` · Last run ${formatDateTime(r.last_run_at)}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void onToggleReminderActive(r)}
+                        className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        {r.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onDeleteReminderRule(r.id)}
+                        className="rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => void onRunDueRemindersHere()}
+                disabled={runDueBusy}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+              >
+                {runDueBusy ? "Running…" : "Run due reminders now"}
+              </button>
+            </div>
+            {runDueSummary ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800">
+                Reminders sent: {runDueSummary.reminders_sent} · Not due yet: {runDueSummary.skipped_not_due} ·
+                Already sent: {runDueSummary.skipped_already_sent} · Couldn&apos;t send:{" "}
+                {runDueSummary.skipped_invalid + runDueSummary.failed}
+                {runDueSummary.failure_messages.length > 0 ? (
+                  <ul className="mt-2 list-inside list-disc text-red-800">
+                    {runDueSummary.failure_messages.slice(0, 6).map((m, i) => (
+                      <li key={i}>{m}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </ContentCard>
+
+          <ContentCard className="space-y-4 border-t border-slate-100 pt-1">
+            <h2 className="text-sm font-semibold text-slate-900">Attendance</h2>
+            {!detail.is_active ? (
+              <p className="text-sm text-amber-800">
+                Event is inactive. Attendance recording is disabled.
+              </p>
+            ) : null}
+            {eligibleChurchMembers.length === 0 ? (
+              <p className="text-sm text-slate-600">No eligible app users for this event.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Name</th>
+                      <th className="px-3 py-2">Email</th>
+                      <th className="px-3 py-2">Attendance status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {eligibleChurchMembers.map((u) => {
+                      const persisted = attendanceByUserId[u.id];
+                      const selectValue = persisted ?? "";
+                      const phase = attendanceRowPhase[u.id] ?? "idle";
+                      const rowErr = attendanceRowError[u.id];
+                      return (
+                        <tr key={u.id}>
+                          <td className="px-3 py-2">{u.full_name}</td>
+                          <td className="px-3 py-2 text-slate-700">{u.email ?? "—"}</td>
+                          <td className="px-3 py-2 align-top">
+                            <select
+                              value={selectValue}
+                              onChange={(e) => {
+                                void onAttendanceStatusChange(u.id, e.target.value);
+                              }}
+                              className={inputCls}
+                              disabled={!detail.is_active || phase === "saving"}
+                              aria-busy={phase === "saving"}
+                            >
+                              <option value="">Select status</option>
+                              {ATTENDANCE_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                            {phase === "saving" ? (
+                              <p className="mt-1 text-xs text-slate-600">Saving…</p>
+                            ) : null}
+                            {phase === "success" ? (
+                              <p className="mt-1 text-xs text-green-800">Saved</p>
+                            ) : null}
+                            {phase === "error" && rowErr ? (
+                              <p className="mt-1 text-xs text-red-800">{rowErr}</p>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
                     })}
                   </tbody>
                 </table>

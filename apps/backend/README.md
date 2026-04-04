@@ -52,6 +52,20 @@ FastAPI service for the church CMS monorepo.
    poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
+6. **Event reminders — automatic scheduler (optional second terminal)**  
+   Due reminders are processed by the same logic as `POST /api/v1/notifications/jobs/run-reminders`. For automatic polling without clicking “Run due reminders” in the admin UI, start the dedicated worker:
+
+   ```bash
+   poetry run reminder-scheduler
+   ```
+
+   Configure the poll interval (seconds) via env (default `60`):
+
+   - `REMINDER_JOB_INTERVAL_SECONDS` — how often the worker wakes up and runs the due-reminder job
+   - `REMINDER_SCHEDULER_ENABLED` — set to `false` to run the process idle (no DB polling; avoids accidental duplicate ticks if you keep the process for other reasons)
+
+   The worker uses the same `DATABASE_URL` as the API. Idempotency is unchanged (`EventReminderRun` + unique `(reminder_rule_id, scheduled_for)`).
+
 ## Tests
 
 ```bash
@@ -83,3 +97,10 @@ Canonical login email is always `User.email` (normalized: lowercased, stripped).
 ## Docker
 
 From repo root: `docker compose up --build` — backend uses `DATABASE_URL` pointing at the `postgres` service. Run Alembic and `bootstrap-admin` inside the backend container when the DB is fresh.
+
+A second container, **`reminder_scheduler`**, runs `poetry run reminder-scheduler` and polls for due event reminders on `REMINDER_JOB_INTERVAL_SECONDS` (default 60). It shares the same image and DB URL as `backend` and does not expose a port. The FastAPI container does **not** embed a background scheduler, so scaling API replicas does not multiply reminder ticks. You can still call `POST /api/v1/notifications/jobs/run-reminders` manually for testing.
+
+Optional Compose env (see root `.env`):
+
+- `REMINDER_JOB_INTERVAL_SECONDS` — default `60`
+- `REMINDER_SCHEDULER_ENABLED` — default `true`. If `false`, the scheduler container stays up but does not poll (remove the service from Compose if you do not want the extra container)
