@@ -12,6 +12,7 @@ from app.modules.attendance.router import router as attendance_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.event_reminders.router import router as event_reminders_router
 from app.modules.church_registry.router import router as church_registry_router
+from app.modules.reports.router import router as reports_router
 
 api_router = APIRouter(prefix=settings.API_PREFIX)
 
@@ -27,4 +28,5 @@ api_router.include_router(volunteer_event_router)
 api_router.include_router(attendance_router)
 api_router.include_router(notifications_router)
 api_router.include_router(event_reminders_router)
+api_router.include_router(reports_router)
 

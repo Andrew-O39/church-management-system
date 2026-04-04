@@ -162,6 +162,9 @@ export default function AppHeader() {
               ) : null}
               {status === "authenticated" && isAdmin ? (
                 <>
+                  <NavLink href="/dashboard" active={pathname === "/dashboard"}>
+                    Dashboard
+                  </NavLink>
                   <NavLink
                     href="/members"
                     active={

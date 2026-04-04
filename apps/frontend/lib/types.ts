@@ -663,3 +663,48 @@ export type RunDueRemindersResponse = {
   failure_messages: string[];
 };
 
+// --- Reports / dashboard (Step 15) — admin only ---
+
+export type DashboardSummaryResponse = {
+  total_users: number;
+  active_users_last_30_days: number;
+  total_ministries: number;
+  active_ministries: number;
+  upcoming_events_count: number;
+  events_this_week: number;
+  volunteers_assigned_upcoming: number;
+  unread_notifications_total: number;
+};
+
+export type AttendanceReportRow = {
+  event_id: string;
+  event_title: string;
+  start_at: string;
+  attendance_count: number;
+};
+
+export type AttendanceReportResponse = {
+  items: AttendanceReportRow[];
+};
+
+export type VolunteerLeaderRow = {
+  user_id: string;
+  full_name: string;
+  assignments_count: number;
+};
+
+export type VolunteerReportResponse = {
+  items: VolunteerLeaderRow[];
+};
+
+export type NotificationInsightsResponse = {
+  total_notifications_sent: number;
+  total_recipients: number;
+  in_app_delivered: number;
+  in_app_failed: number;
+  sms_attempted: number;
+  sms_failed: number;
+  whatsapp_attempted: number;
+  whatsapp_failed: number;
+};
+
