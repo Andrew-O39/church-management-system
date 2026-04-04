@@ -6,7 +6,11 @@ export default {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "Segoe UI", "sans-serif"],
+      },
+    },
   },
   plugins: [],
 } satisfies Config;

@@ -14,6 +14,7 @@ import type {
   ChurchMembershipStatus,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, fieldInput, fieldLabel, surfaceError } from "lib/ui";
 
 const MEMBERSHIP_OPTIONS: { value: "" | ChurchMembershipStatus; label: string }[] = [
   { value: "", label: "Any status" },
@@ -149,8 +150,7 @@ export default function ParishRegistryListPage() {
     setDeceasedApplied(filterDeceased);
   }
 
-  const inputCls =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+  const inputCls = fieldInput;
 
   if (status === "loading") {
     return (
@@ -160,7 +160,7 @@ export default function ParishRegistryListPage() {
       >
         <ContentCard>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
             Checking access…
           </div>
         </ContentCard>
@@ -173,7 +173,7 @@ export default function ParishRegistryListPage() {
       <PageShell title="Parish registry" description="Administrators only.">
         <ContentCard>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
             Redirecting…
           </div>
         </ContentCard>
@@ -184,11 +184,7 @@ export default function ParishRegistryListPage() {
   if (status !== "authenticated" || !user) {
     return (
       <PageShell title="Parish registry" description="">
-        {error ? (
-          <ContentCard>
-            <p className="text-sm text-red-800">{error}</p>
-          </ContentCard>
-        ) : null}
+        {error ? <div className={surfaceError}>{error}</div> : null}
       </PageShell>
     );
   }
@@ -199,17 +195,14 @@ export default function ParishRegistryListPage() {
       description="Official parish records for administration (sacraments, membership, deceased). This is separate from app login accounts. Creating a record here does not create a software login."
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/members/new"
-          className="inline-flex rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-        >
+        <Link href="/members/new" className={btnPrimary}>
           Add member record
         </Link>
       </div>
 
       {stats ? (
         <ContentCard className="mb-4">
-          <h2 className="text-sm font-semibold text-slate-900">Registry summary</h2>
+          <h2 className="shepherd-section-title">Registry summary</h2>
           <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2">
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Total</dt>
@@ -240,7 +233,7 @@ export default function ParishRegistryListPage() {
           <form onSubmit={onSearch} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-1.5 md:col-span-2">
-                <label htmlFor="reg-search" className="text-sm font-medium text-slate-800">
+                <label htmlFor="reg-search" className={fieldLabel}>
                   Search
                 </label>
                 <input
@@ -252,7 +245,7 @@ export default function ParishRegistryListPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">Membership</label>
+                <label className={fieldLabel}>Membership</label>
                 <select
                   value={membershipStatus}
                   onChange={(e) => setMembershipStatus(e.target.value as typeof membershipStatus)}
@@ -266,7 +259,7 @@ export default function ParishRegistryListPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">Active</label>
+                <label className={fieldLabel}>Active</label>
                 <select
                   value={filterActive}
                   onChange={(e) => setFilterActive(e.target.value)}
@@ -278,7 +271,7 @@ export default function ParishRegistryListPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-800">Deceased flag</label>
+                <label className={fieldLabel}>Deceased flag</label>
                 <select
                   value={filterDeceased}
                   onChange={(e) => setFilterDeceased(e.target.value)}
@@ -290,25 +283,18 @@ export default function ParishRegistryListPage() {
                 </select>
               </div>
             </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-            >
+            <button type="submit" className={btnPrimary}>
               Apply filters
             </button>
           </form>
         </ContentCard>
 
-        {error ? (
-          <ContentCard>
-            <p className="text-sm text-red-800">{error}</p>
-          </ContentCard>
-        ) : null}
+        {error ? <div className={surfaceError}>{error}</div> : null}
 
         {loading ? (
           <ContentCard>
             <div className="flex items-center gap-3 text-sm text-slate-600">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
               Loading registry…
             </div>
           </ContentCard>

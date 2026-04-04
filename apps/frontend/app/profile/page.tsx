@@ -10,6 +10,15 @@ import type { MemberSelfPatch } from "lib/types";
 import { clearSessionAndRedirect } from "lib/auth";
 import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import {
+  btnPrimary,
+  fieldInput,
+  fieldLabel,
+  fieldTextarea,
+  surfaceError,
+  surfaceSuccess,
+  surfaceWarning,
+} from "lib/ui";
 
 function optString(v: string) {
   const s = v.trim();
@@ -20,7 +29,7 @@ function AdminDirectoryNotice() {
   const params = useSearchParams();
   if (params.get("notice") !== "admin_only") return null;
   return (
-    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+    <div className={"mb-4 " + surfaceWarning}>
       Parish registry and app user management are limited to administrators. You can still update your profile below.
     </div>
   );
@@ -131,48 +140,36 @@ function ProfilePageContent() {
       {loading ? (
         <ContentCard>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
             Loading your profile…
           </div>
         </ContentCard>
       ) : null}
 
-      {!loading && error && !data ? (
-        <ContentCard>
-          <p className="text-sm text-red-800">{error}</p>
-        </ContentCard>
-      ) : null}
+      {!loading && error && !data ? <div className={surfaceError}>{error}</div> : null}
 
       {!loading && data ? (
         <ContentCard>
-          {success ? (
-            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-              Your changes were saved.
-            </div>
-          ) : null}
+          {success ? <div className={"mb-4 " + surfaceSuccess}>Your changes were saved.</div> : null}
 
-          {error ? (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {error}
-            </div>
-          ) : null}
+          {error ? <div className={"mb-4 " + surfaceError}>{error}</div> : null}
 
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
-                <label htmlFor="pf-name" className="text-sm font-medium text-slate-800">
+                <label htmlFor="pf-name" className={fieldLabel}>
                   Full name
                 </label>
                 <input
                   id="pf-name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={fieldInput}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="pf-login-email" className="text-sm font-medium text-slate-800">
+                <label htmlFor="pf-login-email" className={fieldLabel}>
                   Login email
                 </label>
                 <input
@@ -187,19 +184,19 @@ function ProfilePageContent() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="pf-phone" className="text-sm font-medium text-slate-800">
+                <label htmlFor="pf-phone" className={fieldLabel}>
                   Phone number
                 </label>
                 <input
                   id="pf-phone"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={fieldInput}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="pf-contact-email" className="text-sm font-medium text-slate-800">
+                <label htmlFor="pf-contact-email" className={fieldLabel}>
                   Directory contact email{" "}
                   <span className="font-normal text-slate-500">(optional)</span>
                 </label>
@@ -208,7 +205,7 @@ function ProfilePageContent() {
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
                   type="email"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={fieldInput}
                 />
                 <p className="text-xs text-slate-500">
                   Optional contact email for ministries and events if different from your login email.
@@ -216,52 +213,52 @@ function ProfilePageContent() {
               </div>
 
               <div className="space-y-1.5 md:col-span-2">
-                <label htmlFor="pf-address" className="text-sm font-medium text-slate-800">
+                <label htmlFor="pf-address" className={fieldLabel}>
                   Address
                 </label>
                 <textarea
                   id="pf-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="h-24 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  className={fieldTextarea}
                 />
               </div>
             </div>
 
             <div className="border-t border-slate-100 pt-6">
-              <h2 className="mb-3 text-sm font-semibold text-slate-900">Notifications</h2>
+              <h2 className="shepherd-section-title mb-3">Notifications</h2>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2 md:col-span-2">
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5">
+                  <label className="flex items-center gap-3 rounded-lg border border-slate-300/90 bg-white px-3 py-2.5 shadow-sm shadow-slate-900/[0.03]">
                     <input
                       type="checkbox"
                       checked={whatsappEnabled}
                       onChange={(e) => setWhatsappEnabled(e.target.checked)}
                       className="rounded border-slate-300"
                     />
-                    <span className="text-sm text-slate-800">WhatsApp</span>
+                    <span className="text-sm font-semibold text-slate-900">WhatsApp</span>
                   </label>
 
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5">
+                  <label className="flex items-center gap-3 rounded-lg border border-slate-300/90 bg-white px-3 py-2.5 shadow-sm shadow-slate-900/[0.03]">
                     <input
                       type="checkbox"
                       checked={smsEnabled}
                       onChange={(e) => setSmsEnabled(e.target.checked)}
                       className="rounded border-slate-300"
                     />
-                    <span className="text-sm text-slate-800">SMS</span>
+                    <span className="text-sm font-semibold text-slate-900">SMS</span>
                   </label>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="pf-channel" className="text-sm font-medium text-slate-800">
+                  <label htmlFor="pf-channel" className={fieldLabel}>
                     Preferred channel
                   </label>
                   <select
                     id="pf-channel"
                     value={preferredChannel}
                     onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                    className={fieldInput}
                   >
                     <option value="whatsapp">WhatsApp</option>
                     <option value="sms">SMS</option>
@@ -272,11 +269,7 @@ function ProfilePageContent() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6">
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
-              >
+              <button type="submit" disabled={!canSubmit} className={btnPrimary}>
                 {submitting ? "Saving…" : "Save changes"}
               </button>
             </div>

@@ -10,9 +10,9 @@ import { clearSessionAndRedirect } from "lib/auth";
 import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
 import type { MinistryListResponse, MyMinistriesResponse } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, fieldInput, fieldLabel, surfaceError } from "lib/ui";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 export default function MinistriesPage() {
   const router = useRouter();
@@ -146,19 +146,15 @@ export default function MinistriesPage() {
       }
     >
       <div className="space-y-4">
-        {error ? (
-          <ContentCard>
-            <p className="text-sm text-red-800">{error}</p>
-          </ContentCard>
-        ) : null}
+        {error ? <div className={surfaceError}>{error}</div> : null}
 
         {isAdmin ? (
           <ContentCard>
-            <h2 className="text-sm font-semibold text-slate-900">New ministry</h2>
+            <h2 className="shepherd-section-title">New ministry</h2>
             <form onSubmit={onCreate} className="mt-3 space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label htmlFor="m-new-name" className="text-sm font-medium text-slate-800">
+                  <label htmlFor="m-new-name" className={fieldLabel}>
                     Name
                   </label>
                   <input
@@ -170,7 +166,7 @@ export default function MinistriesPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="m-new-desc" className="text-sm font-medium text-slate-800">
+                  <label htmlFor="m-new-desc" className={fieldLabel}>
                     Description <span className="font-normal text-slate-500">(optional)</span>
                   </label>
                   <input
@@ -181,11 +177,7 @@ export default function MinistriesPage() {
                   />
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={creating || !newName.trim()}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
-              >
+              <button type="submit" disabled={creating || !newName.trim()} className={btnPrimary}>
                 {creating ? "Creating…" : "Create ministry"}
               </button>
             </form>
@@ -196,7 +188,7 @@ export default function MinistriesPage() {
           <ContentCard>
             <form onSubmit={onSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1 space-y-1.5">
-                <label htmlFor="m-search" className="text-sm font-medium text-slate-800">
+                <label htmlFor="m-search" className={fieldLabel}>
                   Search by name
                 </label>
                 <input
@@ -215,10 +207,7 @@ export default function MinistriesPage() {
                 />
                 Active only
               </label>
-              <button
-                type="submit"
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-              >
+              <button type="submit" className={btnPrimary}>
                 Search
               </button>
             </form>
@@ -228,7 +217,7 @@ export default function MinistriesPage() {
         {loading ? (
           <ContentCard>
             <div className="flex items-center gap-3 text-sm text-slate-600">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
               Loading ministries…
             </div>
           </ContentCard>

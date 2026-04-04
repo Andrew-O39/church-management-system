@@ -28,9 +28,22 @@ import type {
 
 import PageShell, { ContentCard } from "components/layout/PageShell";
 import DeliverySummaryContent from "components/notifications/DeliverySummaryContent";
+import {
+  btnGhost,
+  btnPagination,
+  btnPrimary,
+  btnSecondary,
+  btnSecondarySm,
+  fieldInput,
+  notificationCategoryClass,
+  notificationChannelClass,
+  surfaceError,
+  surfaceInfo,
+  surfaceSuccess,
+  surfaceWarning,
+} from "lib/ui";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 const CATEGORY_OPTIONS: NotificationCategory[] = [
   "general",
@@ -352,36 +365,35 @@ export default function NotificationsPage() {
           : "Messages sent to your account in the app."
       }
     >
-      {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      ) : null}
+      <div className="space-y-8">
+      {error ? <div className={surfaceError}>{error}</div> : null}
 
       {isAdmin ? (
-        <ContentCard className="space-y-3">
-          <h2 className="text-base font-semibold text-slate-900">Event reminders</h2>
-          <p className="text-sm text-slate-600">
+        <ContentCard className="space-y-4">
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="shepherd-section-title">Event reminders</h2>
+            <p className="mt-2 text-base text-slate-600">
             Runs any reminder messages that are currently due (based on the reminders you set up on each
             event). Use this if you want to send them right away instead of waiting for the next automatic run.
           </p>
+          </div>
           <button
             type="button"
             onClick={() => void onRunDueReminders()}
             disabled={runDueBusy}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+            className={btnSecondary}
           >
             {runDueBusy ? "Running…" : "Run due reminders now"}
           </button>
           {runDueSummary ? (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800">
-              <p>
+            <div className={surfaceInfo}>
+              <p className="text-sm">
                 Reminders sent: {runDueSummary.reminders_sent} · Not due yet: {runDueSummary.skipped_not_due} ·
                 Already sent: {runDueSummary.skipped_already_sent} · Couldn&apos;t send:{" "}
                 {runDueSummary.skipped_invalid + runDueSummary.failed}
               </p>
               {runDueSummary.failure_messages.length > 0 ? (
-                <ul className="mt-2 list-inside list-disc text-red-800">
+                <ul className="mt-3 list-inside list-disc text-sm text-red-800">
                   {runDueSummary.failure_messages.slice(0, 8).map((m, i) => (
                     <li key={i}>{m}</li>
                   ))}
@@ -393,14 +405,16 @@ export default function NotificationsPage() {
       ) : null}
 
       {isAdmin ? (
-        <ContentCard>
-          <h2 className="text-lg font-semibold text-slate-900">Send notification</h2>
-          <p className="mt-1 text-sm text-slate-600">
+        <ContentCard className="space-y-5">
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="shepherd-section-title">Send notification</h2>
+            <p className="mt-2 text-base text-slate-600">
             Messages go to people who use this app. SMS and WhatsApp are sent using the phone number saved on
             each user&apos;s app profile.
           </p>
+          </div>
           {lastSendSummary ? (
-            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-emerald-950">
+            <div className={surfaceSuccess}>
               <p className="font-semibold text-slate-900">Delivery summary</p>
               <div className="mt-2 text-emerald-900">
                 <DeliverySummaryContent summary={lastSendSummary} compact />
@@ -630,13 +644,13 @@ export default function NotificationsPage() {
             {(channelSms || channelWhatsapp) &&
             audienceType === "direct_users" &&
             selectedDirectUsers.some((u) => !u.phone_number?.trim()) ? (
-              <p className="text-sm text-amber-800">
+              <p className={surfaceWarning}>
                 Some selected people don&apos;t have a phone number on their profile. SMS and WhatsApp can&apos;t
                 be sent to them; in-app still works if you turn it on above.
               </p>
             ) : null}
             {(channelSms || channelWhatsapp) && audienceType !== "direct_users" ? (
-              <p className="text-sm text-amber-800">
+              <p className={surfaceWarning}>
                 SMS and WhatsApp use the phone number saved on each person&apos;s app profile. Anyone without a
                 number won&apos;t get those channels—use in-app if everyone should see the message.
               </p>
@@ -648,7 +662,7 @@ export default function NotificationsPage() {
                 (!channelInApp && !channelSms && !channelWhatsapp) ||
                 (audienceType === "direct_users" && selectedDirectUsers.length === 0)
               }
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+              className={btnPrimary}
             >
               {sending ? "Sending…" : "Send notification"}
             </button>
@@ -656,47 +670,47 @@ export default function NotificationsPage() {
         </ContentCard>
       ) : null}
 
-      <ContentCard>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <ContentCard className="space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Your inbox</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h2 className="shepherd-section-title">Your inbox</h2>
+            <p className="mt-2 text-sm text-slate-500">
               Refreshes about every {INBOX_REFRESH_MS / 1000} seconds so new messages appear without reloading
               the page.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void onMarkAllRead()}
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
+          <button type="button" onClick={() => void onMarkAllRead()} className={btnGhost}>
             Mark all read
           </button>
         </div>
         {loading ? (
-          <p className="mt-4 text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-slate-500">Loading…</p>
         ) : inbox.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-600">No notifications yet.</p>
+          <p className="text-base text-slate-600">No notifications yet.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-slate-100">
+          <ul className="space-y-3">
             {inbox.map((n) => (
-              <li key={n.notification_id} className="py-4 first:pt-0">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-slate-900">{n.title}</p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{n.body}</p>
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5">{n.category}</span>
+              <li
+                key={n.notification_id}
+                className="rounded-xl border border-slate-200/90 bg-stone-50/60 p-4 ring-1 ring-slate-900/[0.02]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold text-slate-900">{n.title}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-base leading-relaxed text-slate-700">{n.body}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className={notificationCategoryClass()}>{n.category}</span>
                       {n.channels.map((c) => (
-                        <span key={c} className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-800">
+                        <span key={c} className={notificationChannelClass(c)}>
                           {c}
                         </span>
                       ))}
+                      <span className="text-slate-400">·</span>
                       <span>{formatDateTime(n.sent_at ?? n.created_at)}</span>
                       {n.related_event_id ? (
                         <Link
                           href={`/events/${n.related_event_id}`}
-                          className="text-slate-700 underline hover:text-slate-900"
+                          className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
                         >
                           Related event
                         </Link>
@@ -704,7 +718,7 @@ export default function NotificationsPage() {
                       {n.related_ministry_id ? (
                         <Link
                           href={`/ministries/${n.related_ministry_id}`}
-                          className="text-slate-700 underline hover:text-slate-900"
+                          className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
                         >
                           Related ministry
                         </Link>
@@ -716,12 +730,12 @@ export default function NotificationsPage() {
                       <button
                         type="button"
                         onClick={() => void onMarkRead(n.notification_id)}
-                        className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        className={btnSecondarySm}
                       >
                         Mark read
                       </button>
                     ) : (
-                      <span className="text-xs text-slate-400">Read</span>
+                      <span className="text-xs font-medium text-slate-400">Read</span>
                     )}
                   </div>
                 </div>
@@ -730,12 +744,12 @@ export default function NotificationsPage() {
           </ul>
         )}
         {inboxTotal > inboxPageSize ? (
-          <div className="mt-4 flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-sm">
             <button
               type="button"
               disabled={inboxPage <= 1}
               onClick={() => setInboxPage((p) => Math.max(1, p - 1))}
-              className="rounded border px-2 py-1 disabled:opacity-40"
+              className={btnPagination}
             >
               Previous
             </button>
@@ -746,7 +760,7 @@ export default function NotificationsPage() {
               type="button"
               disabled={inboxPage >= inboxPages}
               onClick={() => setInboxPage((p) => p + 1)}
-              className="rounded border px-2 py-1 disabled:opacity-40"
+              className={btnPagination}
             >
               Next
             </button>
@@ -755,31 +769,39 @@ export default function NotificationsPage() {
       </ContentCard>
 
       {isAdmin ? (
-        <ContentCard>
-          <h2 className="text-lg font-semibold text-slate-900">Sent notifications</h2>
+        <ContentCard className="space-y-4">
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="shepherd-section-title">Sent notifications</h2>
+          </div>
           {sent.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-600">No notifications sent yet.</p>
+            <p className="text-base text-slate-600">No notifications sent yet.</p>
           ) : (
-            <ul className="mt-4 divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100">
               {sent.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                  <div>
-                    <p className="font-medium text-slate-900">{s.title}</p>
-                    <p className="text-xs text-slate-500">
-                      {s.category} · {s.audience_type} ·{" "}
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">{s.title}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+                      <span className={notificationCategoryClass()}>{s.category}</span>
+                      <span className="text-slate-400">·</span>
+                      <span>{s.audience_type}</span>
+                      <span className="text-slate-400">·</span>
                       <span className="inline-flex flex-wrap gap-1">
                         {s.channels.map((c) => (
-                          <span key={c} className="rounded bg-slate-100 px-1 font-medium">
+                          <span key={c} className={notificationChannelClass(c)}>
                             {c}
                           </span>
                         ))}
-                      </span>{" "}
-                      · {s.recipient_count} recipients · {formatDateTime(s.sent_at ?? s.created_at)}
+                      </span>
+                      <span className="text-slate-400">·</span>
+                      <span>{s.recipient_count} recipients</span>
+                      <span className="text-slate-400">·</span>
+                      <span className="text-slate-500">{formatDateTime(s.sent_at ?? s.created_at)}</span>
                     </p>
                   </div>
                   <Link
                     href={`/notifications/${s.id}`}
-                    className="text-sm font-medium text-slate-700 underline hover:text-slate-900"
+                    className="shrink-0 text-sm font-semibold text-indigo-700 hover:text-indigo-900 hover:underline"
                   >
                     View
                   </Link>
@@ -788,12 +810,12 @@ export default function NotificationsPage() {
             </ul>
           )}
           {sentTotal > sentPageSize ? (
-            <div className="mt-4 flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-sm">
               <button
                 type="button"
                 disabled={sentPage <= 1}
                 onClick={() => setSentPage((p) => Math.max(1, p - 1))}
-                className="rounded border px-2 py-1 disabled:opacity-40"
+                className={btnPagination}
               >
                 Previous
               </button>
@@ -804,7 +826,7 @@ export default function NotificationsPage() {
                 type="button"
                 disabled={sentPage >= sentPages}
                 onClick={() => setSentPage((p) => p + 1)}
-                className="rounded border px-2 py-1 disabled:opacity-40"
+                className={btnPagination}
               >
                 Next
               </button>
@@ -812,6 +834,7 @@ export default function NotificationsPage() {
           ) : null}
         </ContentCard>
       ) : null}
+      </div>
     </PageShell>
   );
 }

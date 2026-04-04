@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import ShepherdLogo from "components/brand/ShepherdLogo";
 import { useAuth } from "components/providers/AuthProvider";
 import { getAccessToken } from "lib/session";
 import { logoutAndRedirect } from "lib/auth";
 import { apiFetch } from "lib/api";
 import type { UnreadCountResponse } from "lib/types";
+import { btnGhost } from "lib/ui";
 
 function formatRole(role: string) {
   return role.split("_").join(" ");
@@ -25,10 +27,10 @@ function NavLink({
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+      className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-offset-white ${
         active
-          ? "bg-slate-100 text-slate-900"
-          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          ? "bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-100"
+          : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
       }`}
     >
       {children}
@@ -88,14 +90,17 @@ export default function AppHeader() {
   };
 
   return (
-    <header className="border-b border-slate-200/80 bg-white">
-      <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-0.5">
+    <header className="border-b border-slate-200/90 bg-white shadow-sm shadow-slate-900/[0.03]">
+      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex min-w-0 flex-col gap-1">
           <Link
             href="/"
-            className="truncate text-base font-semibold tracking-tight text-slate-900 hover:text-slate-700"
+            className="group flex min-w-0 items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2"
           >
-            Church Management System
+            <ShepherdLogo width={36} height={36} className="shrink-0" />
+            <span className="truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-indigo-900">
+              Shepherd
+            </span>
           </Link>
           {showGreeting ? (
             <span className="truncate text-xs text-slate-500">
@@ -130,10 +135,13 @@ export default function AppHeader() {
                 href="/notifications"
                 active={pathname === "/notifications" || pathname.startsWith("/notifications/")}
               >
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1.5">
                   Notifications
                   {unreadCount !== null && unreadCount > 0 ? (
-                    <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                    <span
+                      className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm ring-1 ring-amber-600/20"
+                      aria-label={`${unreadCount} unread`}
+                    >
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   ) : null}
@@ -148,10 +156,7 @@ export default function AppHeader() {
                 </NavLink>
               ) : null}
               {status === "authenticated" ? (
-                <NavLink
-                  href="/volunteers"
-                  active={pathname === "/volunteers"}
-                >
+                <NavLink href="/volunteers" active={pathname === "/volunteers"}>
                   Volunteers
                 </NavLink>
               ) : null}
@@ -175,11 +180,7 @@ export default function AppHeader() {
                   </NavLink>
                 </>
               ) : null}
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              >
+              <button type="button" onClick={onLogout} className={btnGhost}>
                 Log out
               </button>
             </>

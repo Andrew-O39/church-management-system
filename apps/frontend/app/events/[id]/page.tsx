@@ -39,9 +39,18 @@ import type {
   VolunteerRoleListResponse,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import {
+  btnDangerSm,
+  btnPrimary,
+  btnPrimarySm,
+  btnSecondary,
+  btnSecondarySm,
+  fieldInput,
+  surfaceError,
+  surfaceInfo,
+} from "lib/ui";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 const EVENT_TYPES: EventType[] = ["service", "meeting", "rehearsal", "retreat", "conference", "other"];
 const EVENT_VISIBILITIES: EventVisibility[] = ["public", "internal"];
@@ -583,7 +592,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
       <PageShell title="Event" description="Loading…">
         <ContentCard>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
             Loading…
           </div>
         </ContentCard>
@@ -608,17 +617,23 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <PageShell title={detail.title} description="Event details">
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
-          <Link href="/events" className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
+          <Link
+            href="/events"
+            className="text-sm font-medium text-indigo-800 underline-offset-2 hover:text-indigo-950 hover:underline"
+          >
             ← All events
           </Link>
         </div>
 
         {isAdmin ? (
           <>
-          <ContentCard className="space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900">Edit event</h2>
+          <ContentCard className="space-y-5">
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="shepherd-section-title">Edit event</h2>
+              <p className="mt-2 text-sm text-slate-600">Update when, where, and how this event appears.</p>
+            </div>
             <form onSubmit={onSave} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
@@ -688,34 +703,25 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                 </label>
               </div>
 
-              {error ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                  {error}
-                </div>
-              ) : null}
+              {error ? <div className={surfaceError}>{error}</div> : null}
 
               <div className="flex flex-wrap gap-3">
-                <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                <button type="submit" className={btnPrimary}>
                   Save
                 </button>
-                <button
-                  type="button"
-                  onClick={onDeactivate}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                >
+                <button type="button" onClick={onDeactivate} className={btnSecondary}>
                   Deactivate
                 </button>
               </div>
             </form>
           </ContentCard>
 
-          <ContentCard className="space-y-4 border-t border-slate-100 pt-1">
-            <h2 className="text-sm font-semibold text-slate-900">Volunteer scheduling</h2>
-            {volunteerSectionError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                {volunteerSectionError}
-              </div>
-            ) : null}
+          <ContentCard className="space-y-5">
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="shepherd-section-title">Volunteer scheduling</h2>
+              <p className="mt-2 text-sm text-slate-600">Assign roles and track who is serving at this event.</p>
+            </div>
+            {volunteerSectionError ? <div className={surfaceError}>{volunteerSectionError}</div> : null}
             {!detail.is_active ? (
               <p className="text-sm text-amber-800">Event is inactive. You cannot add new volunteer assignments.</p>
             ) : null}
@@ -724,7 +730,10 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               ministry. For ministry events, only active members of that ministry can be assigned.
             </p>
 
-            <form onSubmit={onAssignVolunteer} className="space-y-3 rounded-lg border border-slate-100 p-3">
+            <form
+              onSubmit={onAssignVolunteer}
+              className="space-y-3 rounded-xl border border-slate-200/80 bg-stone-50/50 p-4 ring-1 ring-slate-900/[0.02]"
+            >
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Add assignment</p>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
@@ -784,7 +793,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               <button
                 type="submit"
                 disabled={!detail.is_active || volAssigning || !volNewUserId || !volNewRoleId}
-                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+                className={btnPrimarySm}
               >
                 {volAssigning ? "Assigning…" : "Assign volunteer"}
               </button>
@@ -850,7 +859,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                             type="button"
                             onClick={() => void onSaveVolunteerNotes(row.id)}
                             disabled={nPhase === "saving"}
-                            className="mt-1 rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            className={btnSecondarySm + " mt-1"}
                           >
                             {nPhase === "saving" ? "Saving…" : "Save notes"}
                           </button>
@@ -865,7 +874,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                           <button
                             type="button"
                             onClick={() => void onRemoveVolunteer(row.id)}
-                            className="rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50"
+                            className={btnDangerSm}
                           >
                             Remove
                           </button>
@@ -879,22 +888,23 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             )}
           </ContentCard>
 
-          <ContentCard className="space-y-4 border-t border-slate-100 pt-1">
-            <h2 className="text-sm font-semibold text-slate-900">Event reminders</h2>
-            <div className="space-y-2 text-sm text-slate-600">
-              <p>Set up automatic messages to be sent before this event starts.</p>
-              <p>Choose when to send them and how they should be delivered.</p>
-              <p>
-                Use &quot;Run due reminders now&quot; to send any reminders that are currently due.
-              </p>
-            </div>
-            {reminderSectionError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                {reminderSectionError}
+          <ContentCard className="space-y-5">
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="shepherd-section-title">Event reminders</h2>
+              <div className="mt-2 space-y-2 text-sm text-slate-600">
+                <p>Set up automatic messages to be sent before this event starts.</p>
+                <p>Choose when to send them and how they should be delivered.</p>
+                <p>
+                  Use &quot;Run due reminders now&quot; to send any reminders that are currently due.
+                </p>
               </div>
-            ) : null}
+            </div>
+            {reminderSectionError ? <div className={surfaceError}>{reminderSectionError}</div> : null}
 
-            <form onSubmit={onCreateReminder} className="space-y-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+            <form
+              onSubmit={onCreateReminder}
+              className="space-y-3 rounded-xl border border-slate-200/80 bg-stone-50/50 p-4 ring-1 ring-slate-900/[0.02]"
+            >
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">New reminder</p>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
@@ -968,11 +978,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                   WhatsApp
                 </label>
               </fieldset>
-              <button
-                type="submit"
-                disabled={!detail.is_active || reminderSaving}
-                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
-              >
+              <button type="submit" disabled={!detail.is_active || reminderSaving} className={btnPrimarySm}>
                 {reminderSaving ? "Saving…" : "Add reminder"}
               </button>
             </form>
@@ -994,18 +1000,10 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void onToggleReminderActive(r)}
-                        className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
+                      <button type="button" onClick={() => void onToggleReminderActive(r)} className={btnSecondarySm}>
                         {r.is_active ? "Deactivate" : "Activate"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void onDeleteReminderRule(r.id)}
-                        className="rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50"
-                      >
+                      <button type="button" onClick={() => void onDeleteReminderRule(r.id)} className={btnDangerSm}>
                         Delete
                       </button>
                     </div>
@@ -1014,18 +1012,13 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               </ul>
             )}
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                onClick={() => void onRunDueRemindersHere()}
-                disabled={runDueBusy}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-              >
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+              <button type="button" onClick={() => void onRunDueRemindersHere()} disabled={runDueBusy} className={btnSecondary}>
                 {runDueBusy ? "Running…" : "Run due reminders now"}
               </button>
             </div>
             {runDueSummary ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800">
+              <div className={surfaceInfo + " text-sm"}>
                 Reminders sent: {runDueSummary.reminders_sent} · Not due yet: {runDueSummary.skipped_not_due} ·
                 Already sent: {runDueSummary.skipped_already_sent} · Couldn&apos;t send:{" "}
                 {runDueSummary.skipped_invalid + runDueSummary.failed}
@@ -1040,8 +1033,11 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             ) : null}
           </ContentCard>
 
-          <ContentCard className="space-y-4 border-t border-slate-100 pt-1">
-            <h2 className="text-sm font-semibold text-slate-900">Attendance</h2>
+          <ContentCard className="space-y-5 border-t-2 border-indigo-100 pt-1">
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="shepherd-section-title">Attendance</h2>
+              <p className="mt-2 text-sm text-slate-600">Record who was present after or during the event.</p>
+            </div>
             {!detail.is_active ? (
               <p className="text-sm text-amber-800">
                 Event is inactive. Attendance recording is disabled.
@@ -1106,29 +1102,29 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           </ContentCard>
           </>
         ) : (
-          <ContentCard className="space-y-3">
-            <p className="text-sm text-slate-700">
+          <ContentCard className="space-y-4">
+            <p className="text-base text-slate-800">
               {formatDateTime(detail.start_at)} → {formatDateTime(detail.end_at)}
             </p>
-            <p className="text-sm text-slate-700">
+            <p className="text-base text-slate-800">
               Location: {detail.location}
             </p>
-            <p className="text-sm text-slate-700">
+            <p className="text-base text-slate-800">
               Scope: {ministryLabel}
             </p>
             <p className="text-sm text-slate-500">
               Type: {detail.event_type} · Visibility: {detail.visibility}
             </p>
-            {detail.description ? <p className="text-sm text-slate-700">{detail.description}</p> : null}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {detail.description ? <p className="text-base leading-relaxed text-slate-700">{detail.description}</p> : null}
+            <div className={surfaceInfo}>
               Your attendance:{" "}
-              <span className="font-medium capitalize">
+              <span className="font-semibold capitalize text-slate-900">
                 {myAttendance?.recorded ? myAttendance.status : "Not recorded"}
               </span>
             </div>
             {myVolunteers.length > 0 ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <p className="font-medium text-slate-900">Your volunteer role(s)</p>
+              <div className={surfaceInfo}>
+                <p className="font-semibold text-slate-900">Your volunteer role(s)</p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-slate-800">
                   {myVolunteers.map((v) => (
                     <li key={v.id}>

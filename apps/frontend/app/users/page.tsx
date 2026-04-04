@@ -10,6 +10,7 @@ import { clearSessionAndRedirect } from "lib/auth";
 import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
 import type { MemberListResponse, UserRole } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, fieldInput, surfaceError } from "lib/ui";
 
 function formatRole(role: string) {
   return role.split("_").join(" ");
@@ -118,20 +119,20 @@ export default function AppUsersListPage() {
         <ContentCard className="space-y-4">
           <form onSubmit={onApplyFilters} className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
             <div className="min-w-[200px] flex-1 space-y-1">
-              <label className="text-xs font-medium text-slate-700">Search</label>
+              <label className="text-xs font-semibold text-slate-800">Search</label>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Name or email"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                className={fieldInput}
               />
             </div>
             <div className="w-full space-y-1 md:w-40">
-              <label className="text-xs font-medium text-slate-700">Role</label>
+              <label className="text-xs font-semibold text-slate-800">Role</label>
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value as "" | UserRole)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+                className={fieldInput}
               >
                 <option value="">Any</option>
                 <option value="admin">Admin</option>
@@ -140,28 +141,23 @@ export default function AppUsersListPage() {
               </select>
             </div>
             <div className="w-full space-y-1 md:w-36">
-              <label className="text-xs font-medium text-slate-700">Active</label>
+              <label className="text-xs font-semibold text-slate-800">Active</label>
               <select
                 value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+                className={fieldInput}
               >
                 <option value="">Any</option>
                 <option value="true">Active</option>
                 <option value="false">Inactive</option>
               </select>
             </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-            >
+            <button type="submit" className={btnPrimary}>
               Apply
             </button>
           </form>
 
-          {error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
-          ) : null}
+          {error ? <div className={surfaceError}>{error}</div> : null}
 
           {loading ? (
             <p className="text-sm text-slate-600">Loading…</p>

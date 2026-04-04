@@ -20,9 +20,9 @@ import type {
 } from "lib/types";
 
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, fieldInput, fieldLabel, surfaceError } from "lib/ui";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 function toIsoFromDatetimeLocal(v: string) {
   const d = new Date(v);
@@ -193,17 +193,17 @@ export default function EventsPage() {
   const AdminControls = (
     <>
       <ContentCard className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-900">Create event</h2>
+        <h2 className="shepherd-section-title">Create event</h2>
         <form onSubmit={onCreate} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label htmlFor="ev-title" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-title" className={fieldLabel}>
                 Title
               </label>
               <input id="ev-title" value={cTitle} onChange={(e) => setCTitle(e.target.value)} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="ev-type" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-type" className={fieldLabel}>
                 Type
               </label>
               <select id="ev-type" value={cType} onChange={(e) => setCType(e.target.value as EventType)} className={inputCls}>
@@ -217,7 +217,7 @@ export default function EventsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="ev-desc" className="text-sm font-medium text-slate-800">
+            <label htmlFor="ev-desc" className={fieldLabel}>
               Description <span className="font-normal text-slate-500">(optional)</span>
             </label>
             <textarea id="ev-desc" value={cDesc} onChange={(e) => setCDesc(e.target.value)} className={`${inputCls} min-h-[88px] resize-y`} />
@@ -225,13 +225,13 @@ export default function EventsPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label htmlFor="ev-start" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-start" className={fieldLabel}>
                 Start
               </label>
               <input id="ev-start" type="datetime-local" value={cStartAt} onChange={(e) => setCStartAt(e.target.value)} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="ev-end" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-end" className={fieldLabel}>
                 End
               </label>
               <input id="ev-end" type="datetime-local" value={cEndAt} onChange={(e) => setCEndAt(e.target.value)} className={inputCls} />
@@ -240,13 +240,13 @@ export default function EventsPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label htmlFor="ev-loc" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-loc" className={fieldLabel}>
                 Location
               </label>
               <input id="ev-loc" value={cLocation} onChange={(e) => setCLocation(e.target.value)} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="ev-visibility" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-visibility" className={fieldLabel}>
                 Visibility
               </label>
               <select id="ev-visibility" value={cVisibility} onChange={(e) => setCVisibility(e.target.value as EventVisibility)} className={inputCls}>
@@ -261,7 +261,7 @@ export default function EventsPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label htmlFor="ev-ministry" className="text-sm font-medium text-slate-800">
+              <label htmlFor="ev-ministry" className={fieldLabel}>
                 Ministry (optional)
               </label>
               <select id="ev-ministry" value={cMinistryId} onChange={(e) => setCMinistryId(e.target.value)} className={inputCls}>
@@ -280,15 +280,11 @@ export default function EventsPage() {
                 onChange={(e) => setCIsActive(e.target.checked)}
                 className="rounded border-slate-300"
               />
-              <span className="text-sm font-medium text-slate-800">Active</span>
+              <span className="text-sm font-semibold text-slate-900">Active</span>
             </label>
           </div>
 
-          <button
-            type="submit"
-            disabled={creating}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
-          >
+          <button type="submit" disabled={creating} className={btnPrimary}>
             {creating ? "Creating…" : "Create event"}
           </button>
         </form>
@@ -297,13 +293,13 @@ export default function EventsPage() {
       <ContentCard>
         <form onSubmit={onSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1 space-y-1.5">
-            <label htmlFor="ev-search" className="text-sm font-medium text-slate-800">
+            <label htmlFor="ev-search" className={fieldLabel}>
               Search
             </label>
             <input id="ev-search" value={search} onChange={(e) => setSearch(e.target.value)} className={inputCls} placeholder="Title contains…" />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="ev-type-filter" className="text-sm font-medium text-slate-800">
+            <label htmlFor="ev-type-filter" className={fieldLabel}>
               Event type
             </label>
             <select id="ev-type-filter" value={eventType} onChange={(e) => setEventType(e.target.value as EventType | "all")} className={inputCls}>
@@ -316,7 +312,7 @@ export default function EventsPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="ev-ministry-filter" className="text-sm font-medium text-slate-800">
+            <label htmlFor="ev-ministry-filter" className={fieldLabel}>
               Ministry
             </label>
             <select id="ev-ministry-filter" value={ministryId} onChange={(e) => setMinistryId(e.target.value)} className={inputCls}>
@@ -332,7 +328,7 @@ export default function EventsPage() {
             <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
             Active only
           </label>
-          <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+          <button type="submit" className={btnPrimary}>
             Search
           </button>
         </form>
@@ -350,16 +346,12 @@ export default function EventsPage() {
       }
     >
       <div className="space-y-4">
-        {error ? (
-          <ContentCard>
-            <p className="text-sm text-red-800">{error}</p>
-          </ContentCard>
-        ) : null}
+        {error ? <div className={surfaceError}>{error}</div> : null}
 
         {status === "loading" || loading ? (
           <ContentCard>
             <div className="flex items-center gap-3 text-sm text-slate-600">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
               Loading events…
             </div>
           </ContentCard>

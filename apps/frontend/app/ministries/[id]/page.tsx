@@ -15,9 +15,9 @@ import type {
   MinistryRoleInMinistry,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, btnSecondary, fieldInput, surfaceError } from "lib/ui";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 const ROLE_OPTIONS: MinistryRoleInMinistry[] = ["member", "leader", "coordinator"];
 
@@ -217,8 +217,8 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
     return (
       <PageShell title="Ministry" description="Ministry details">
         <ContentCard>
-          <p className="text-sm text-red-800">{error}</p>
-          <Link href="/ministries" className="mt-4 inline-block text-sm font-medium text-slate-800 underline">
+          <div className={surfaceError}>{error}</div>
+          <Link href="/ministries" className="mt-4 inline-block text-sm font-medium text-indigo-800 underline-offset-2 hover:text-indigo-950 hover:underline">
             ← Back to ministries
           </Link>
         </ContentCard>
@@ -241,11 +241,7 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
         </Link>
       </div>
 
-      {error ? (
-        <ContentCard className="mb-4">
-          <p className="text-sm text-red-800">{error}</p>
-        </ContentCard>
-      ) : null}
+      {error ? <div className={"mb-4 " + surfaceError}>{error}</div> : null}
 
       {!isAdmin && myMembership ? (
         <ContentCard className="mb-4">
@@ -286,7 +282,7 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
             <button
               type="submit"
               disabled={savingMinistry || !editName.trim()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              className={btnPrimary}
             >
               {savingMinistry ? "Saving…" : "Save changes"}
             </button>
@@ -332,7 +328,7 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
             <button
               type="submit"
               disabled={adding || !addEmail.trim() || !detail.is_active}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              className={btnPrimary}
             >
               {adding ? "Adding…" : "Add"}
             </button>
@@ -347,11 +343,7 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
                 className={`${inputCls} max-w-md`}
                 placeholder="Search members by name or email"
               />
-              <button
-                type="submit"
-                disabled={searching}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800"
-              >
+              <button type="submit" disabled={searching} className={btnSecondary}>
                 {searching ? "Searching…" : "Search"}
               </button>
             </form>

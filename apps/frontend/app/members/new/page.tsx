@@ -16,9 +16,9 @@ import type {
   MaritalStatus,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, fieldInput } from "lib/ui";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 function optStr(s: string): string | undefined {
   const t = s.trim();
@@ -618,7 +618,7 @@ export default function CreateChurchMemberPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              className={btnPrimary}
             >
               {submitting ? "Saving…" : "Create parish record"}
             </button>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { useAuth } from "components/providers/AuthProvider";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimarySm, btnSecondary, fieldInput, surfaceError } from "lib/ui";
 import { apiFetch } from "lib/api";
 import { clearSessionAndRedirect } from "lib/auth";
 import { fetchAllListPages } from "lib/api-pagination";
@@ -18,8 +19,7 @@ import type {
   VolunteerRoleListResponse,
 } from "lib/types";
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -220,14 +220,10 @@ export default function VolunteersPage() {
       description={isAdmin ? "Your assignments and church-wide volunteer roles" : "Your volunteer assignments"}
     >
       <div className="space-y-4">
-        {error ? (
-          <ContentCard>
-            <p className="text-sm text-red-800">{error}</p>
-          </ContentCard>
-        ) : null}
+        {error ? <div className={surfaceError}>{error}</div> : null}
 
         <ContentCard className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-900">My assignments</h2>
+          <h2 className="shepherd-section-title">My assignments</h2>
           {myAssignments.length === 0 ? (
             <p className="text-sm text-slate-600">You have no volunteer assignments on upcoming or past visible events.</p>
           ) : (
@@ -258,7 +254,7 @@ export default function VolunteersPage() {
 
         {isAdmin ? (
           <ContentCard className="space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900">Volunteer roles (admin)</h2>
+            <h2 className="shepherd-section-title">Volunteer roles (admin)</h2>
             <p className="text-xs text-slate-600">
               Church-wide roles apply to any event. Ministry-scoped roles can only be used on events for that same
               ministry.
@@ -277,11 +273,7 @@ export default function VolunteersPage() {
               Show inactive roles
             </label>
 
-            {roleMutationError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                {roleMutationError}
-              </div>
-            ) : null}
+            {roleMutationError ? <div className={surfaceError}>{roleMutationError}</div> : null}
 
             <form onSubmit={onCreateRole} className="space-y-3 rounded-lg border border-slate-100 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">New role</p>
@@ -320,11 +312,7 @@ export default function VolunteersPage() {
                   placeholder="Short description"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={creatingRole || !newRoleName.trim()}
-                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
-              >
+              <button type="submit" disabled={creatingRole || !newRoleName.trim()} className={btnPrimarySm}>
                 {creatingRole ? "Creating…" : "Create role"}
               </button>
             </form>
@@ -361,18 +349,10 @@ export default function VolunteersPage() {
                   <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={inputCls} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={editSaving || !editName.trim()}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
-                  >
+                  <button type="submit" disabled={editSaving || !editName.trim()} className={btnPrimarySm}>
                     {editSaving ? "Saving…" : "Save changes"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                  >
+                  <button type="button" onClick={cancelEdit} className={btnSecondary}>
                     Cancel
                   </button>
                 </div>

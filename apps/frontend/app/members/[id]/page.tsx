@@ -16,12 +16,12 @@ import type {
   MaritalStatus,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import { btnPrimary, fieldInput } from "lib/ui";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400";
+const inputCls = fieldInput;
 
 function isUuid(s: string) {
   return UUID_RE.test(s.trim());
@@ -682,7 +682,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
                 <button
                   type="submit"
                   disabled={!patchPreview || submitting}
-                  className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+                  className={btnPrimary}
                 >
                   {submitting ? "Saving…" : "Save changes"}
                 </button>
