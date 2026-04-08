@@ -137,7 +137,7 @@ async def test_parish_registry_csv_uses_registry_fields_only(
         json={
             "first_name": "Registry",
             "last_name": "Only",
-            "registration_number": "REG-001",
+            "registration_number": "2026-0001",
             "gender": "male",
         },
     )

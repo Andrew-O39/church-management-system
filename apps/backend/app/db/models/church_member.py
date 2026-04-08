@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Text, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,6 +25,9 @@ class ChurchMember(Base):
     """
 
     __tablename__ = "church_members"
+    __table_args__ = (
+        UniqueConstraint("registration_number", name="uq_church_members_registration_number"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),

@@ -313,6 +313,7 @@ export type ChurchMemberListItem = {
   full_name: string;
   first_name: string;
   last_name: string;
+  registration_number: string | null;
   email: string | null;
   phone: string | null;
   membership_status: ChurchMembershipStatus;
@@ -387,6 +388,9 @@ export type ChurchMemberDetailResponse = {
 export type ChurchMemberStatsResponse = {
   total_members: number;
   active_members: number;
+  inactive_members: number;
+  visitor_members: number;
+  transferred_members: number;
   deceased_members: number;
   male_members: number;
   female_members: number;

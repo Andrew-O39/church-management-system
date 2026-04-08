@@ -7,7 +7,13 @@ import { useAuth } from "components/providers/AuthProvider";
 import { apiFetch } from "lib/api";
 import { getAccessToken } from "lib/session";
 import { clearSessionAndRedirect } from "lib/auth";
-import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
+import {
+  getApiErrorDetail,
+  isConflictError,
+  isInactiveAccountError,
+  isUnauthorized,
+  toErrorMessage,
+} from "lib/errors";
 import type {
   ChurchMemberCreateBody,
   ChurchMemberDetailResponse,
@@ -28,6 +34,17 @@ function optStr(s: string): string | undefined {
 function optDate(s: string): string | undefined {
   const t = s.trim();
   return t === "" ? undefined : t;
+}
+
+function registryValidationMessage(err: unknown): string {
+  const detail = (getApiErrorDetail(err) ?? "").toLowerCase();
+  if (isConflictError(err) && detail.includes("registration number")) {
+    return "This registration number is already in use.";
+  }
+  if (detail.includes("registration number already exists")) {
+    return "This registration number is already in use.";
+  }
+  return toErrorMessage(err);
 }
 
 function buildCreateBody(f: {
@@ -265,7 +282,7 @@ export default function CreateChurchMemberPage() {
         clearSessionAndRedirect(router, "account_inactive");
         return;
       }
-      setError(toErrorMessage(err));
+      setError(registryValidationMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -410,6 +427,9 @@ export default function CreateChurchMemberPage() {
                   onChange={(e) => setRegistrationNumber(e.target.value)}
                   className={inputCls}
                 />
+                <p className="text-xs text-slate-500">
+                  Optional. Leave blank to auto-generate (example: 2026-0001).
+                </p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-800">Membership status</label>

@@ -329,20 +329,27 @@ export default function ParishRegistryListPage() {
           </p>
           <div className="mt-4 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-800">Core</h3>
-              <dl className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <h3 className="text-sm font-semibold text-slate-800">Membership status</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Counts follow each record&rsquo;s membership status (not the generic &ldquo;active in
+                registry&rdquo; checkbox).
+              </p>
+              <dl className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard label="Total" value={stats.total_members} />
                 <StatCard label="Active" value={stats.active_members} />
+                <StatCard label="Inactive" value={stats.inactive_members} />
+                <StatCard label="Visitor" value={stats.visitor_members} />
+                <StatCard label="Transferred" value={stats.transferred_members} />
                 <StatCard label="Deceased" value={stats.deceased_members} />
-                <StatCard
-                  label="Unknown DOB (age bands)"
-                  value={stats.age_groups.unknown ?? 0}
-                />
               </dl>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-800">Demographics</h3>
               <dl className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard
+                  label="Unknown DOB (age bands)"
+                  value={stats.age_groups.unknown ?? 0}
+                />
                 <StatCard label="Male" value={stats.male_members} />
                 <StatCard label="Female" value={stats.female_members} />
                 <StatCard label="Children (0–12)" value={stats.children_members} />
@@ -594,9 +601,9 @@ export default function ParishRegistryListPage() {
               <table className="min-w-full text-left text-sm">
                 <thead className="border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
+                    <th className="px-4 py-3">Registration #</th>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Joined</th>
                   </tr>
                 </thead>
@@ -610,6 +617,9 @@ export default function ParishRegistryListPage() {
                   ) : (
                     items.map((m) => (
                       <tr key={m.church_member_id} className="hover:bg-slate-50/80">
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">
+                          {m.registration_number ?? "—"}
+                        </td>
                         <td className="px-4 py-3">
                           <Link
                             href={`/members/${m.church_member_id}`}
@@ -622,10 +632,6 @@ export default function ParishRegistryListPage() {
                           ) : null}
                         </td>
                         <td className="px-4 py-3 capitalize text-slate-700">{m.membership_status}</td>
-                        <td className="px-4 py-3 text-slate-700">
-                          <div>{m.email ?? "—"}</div>
-                          {m.phone ? <div className="text-xs text-slate-500">{m.phone}</div> : null}
-                        </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                           {new Date(m.joined_at).toLocaleDateString()}
                         </td>

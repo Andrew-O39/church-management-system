@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
+import re
 
 import pytest
 from httpx import AsyncClient
@@ -201,6 +202,9 @@ async def test_church_member_stats_shape(
     for key in (
         "male_members",
         "female_members",
+        "inactive_members",
+        "visitor_members",
+        "transferred_members",
         "children_members",
         "young_adult_members",
         "adult_members",
@@ -298,6 +302,49 @@ async def test_church_member_list_filters_age_group_and_sacraments(
 
 
 @pytest.mark.asyncio
+async def test_patch_church_member_duplicate_registration_number(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "patchdupadmin@example.com")
+    await _promote_to_admin(session_factory, "patchdupadmin@example.com")
+    tok = await _login(client, "patchdupadmin@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    year = stats_reference_date().year
+    kept = f"{year}-7701"
+    clash = f"{year}-7702"
+
+    r1 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={"first_name": "Keep", "last_name": "Number", "registration_number": kept},
+    )
+    assert r1.status_code == 201, r1.text
+    mid_keep = r1.json()["id"]
+
+    r2 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={"first_name": "Other", "last_name": "Row", "registration_number": clash},
+    )
+    assert r2.status_code == 201, r2.text
+    mid_other = r2.json()["id"]
+
+    pr = await client.patch(
+        f"/api/v1/church-members/{mid_other}",
+        headers=h,
+        json={"registration_number": kept},
+    )
+    assert pr.status_code == 409, pr.text
+    assert "already in use" in pr.json()["detail"].lower()
+
+    ok = await client.get(f"/api/v1/church-members/{mid_keep}", headers=h)
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["registration_number"] == kept
+
+
+@pytest.mark.asyncio
 async def test_church_members_list_forbidden_for_non_admin(client: AsyncClient) -> None:
     await _register(client, "nomemlist@example.com")
     tok = await _login(client, "nomemlist@example.com")
@@ -306,3 +353,124 @@ async def test_church_members_list_forbidden_for_non_admin(client: AsyncClient) 
         headers={"Authorization": f"Bearer {tok}"},
     )
     assert r.status_code == 403, r.text
+
+
+@pytest.mark.asyncio
+async def test_registration_number_auto_generated_and_sequential(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "regnumadmin@example.com")
+    await _promote_to_admin(session_factory, "regnumadmin@example.com")
+    tok = await _login(client, "regnumadmin@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    r1 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={"first_name": "Auto", "last_name": "One"},
+    )
+    assert r1.status_code == 201, r1.text
+    n1 = r1.json()["registration_number"]
+    assert n1 is not None
+    assert re.fullmatch(r"\d{4}-\d{4}", n1)
+
+    r2 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={"first_name": "Auto", "last_name": "Two"},
+    )
+    assert r2.status_code == 201, r2.text
+    n2 = r2.json()["registration_number"]
+    assert n2 is not None
+    assert re.fullmatch(r"\d{4}-\d{4}", n2)
+    assert n2[:4] == n1[:4]
+    assert int(n2[-4:]) == int(n1[-4:]) + 1
+
+
+@pytest.mark.asyncio
+async def test_registration_number_manual_override_and_duplicate_rejected(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "regnummanual@example.com")
+    await _promote_to_admin(session_factory, "regnummanual@example.com")
+    tok = await _login(client, "regnummanual@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    r1 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Manual",
+            "last_name": "One",
+            "registration_number": "2030-0042",
+        },
+    )
+    assert r1.status_code == 201, r1.text
+    assert r1.json()["registration_number"] == "2030-0042"
+
+    r2 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Manual",
+            "last_name": "Dup",
+            "registration_number": "2030-0042",
+        },
+    )
+    assert r2.status_code == 409, r2.text
+
+
+@pytest.mark.asyncio
+async def test_registration_number_invalid_format_rejected(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "regnumformat@example.com")
+    await _promote_to_admin(session_factory, "regnumformat@example.com")
+    tok = await _login(client, "regnumformat@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    r = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Bad",
+            "last_name": "Format",
+            "registration_number": "ABC-1234",
+        },
+    )
+    assert r.status_code == 400, r.text
+
+
+@pytest.mark.asyncio
+async def test_registration_number_auto_generation_respects_existing_highest_same_year(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "regnumseed@example.com")
+    await _promote_to_admin(session_factory, "regnumseed@example.com")
+    tok = await _login(client, "regnumseed@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    year = stats_reference_date().year
+    seeded = f"{year}-0099"
+    r1 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Seed",
+            "last_name": "NinetyNine",
+            "registration_number": seeded,
+        },
+    )
+    assert r1.status_code == 201, r1.text
+
+    r2 = await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={"first_name": "Seed", "last_name": "Auto"},
+    )
+    assert r2.status_code == 201, r2.text
+    assert r2.json()["registration_number"] == f"{year}-0100"

@@ -7,7 +7,13 @@ import { useAuth } from "components/providers/AuthProvider";
 import { apiFetch } from "lib/api";
 import { getAccessToken } from "lib/session";
 import { clearSessionAndRedirect } from "lib/auth";
-import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
+import {
+  getApiErrorDetail,
+  isConflictError,
+  isInactiveAccountError,
+  isUnauthorized,
+  toErrorMessage,
+} from "lib/errors";
 import type {
   ChurchMemberDetailResponse,
   ChurchMemberPatchBody,
@@ -100,6 +106,17 @@ function fromJoinedLocal(s: string): string | null {
   const d = new Date(t);
   if (isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+function registryValidationMessage(err: unknown): string {
+  const detail = (getApiErrorDetail(err) ?? "").toLowerCase();
+  if (isConflictError(err) && detail.includes("registration number")) {
+    return "This registration number is already in use.";
+  }
+  if (detail.includes("registration number already exists")) {
+    return "This registration number is already in use.";
+  }
+  return toErrorMessage(err);
 }
 
 export default function ChurchMemberDetailPage({ params }: { params: { id: string } }) {
@@ -219,7 +236,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
         clearSessionAndRedirect(router, "account_inactive");
         return;
       }
-      setError(toErrorMessage(err));
+      setError(registryValidationMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -686,7 +703,9 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
                 >
                   {submitting ? "Saving…" : "Save changes"}
                 </button>
-                {!patchPreview ? (
+                {success && !patchPreview ? (
+                  <span className="text-sm text-green-700">Changes saved.</span>
+                ) : !patchPreview ? (
                   <span className="text-sm text-slate-500">No changes to save.</span>
                 ) : null}
               </div>

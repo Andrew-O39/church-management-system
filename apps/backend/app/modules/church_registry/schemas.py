@@ -20,6 +20,7 @@ class ChurchMemberListItem(BaseModel):
     full_name: str
     first_name: str
     last_name: str
+    registration_number: str | None
     email: str | None
     phone: str | None
     membership_status: ChurchMembershipStatus
@@ -183,6 +184,9 @@ class LinkUserBody(BaseModel):
 class ChurchMemberStatsResponse(BaseModel):
     total_members: int
     active_members: int
+    inactive_members: int
+    visitor_members: int
+    transferred_members: int
     deceased_members: int
     male_members: int
     female_members: int

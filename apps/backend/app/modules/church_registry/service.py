@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.db.models.church_event import ChurchEvent
 from app.db.models.church_member import ChurchMember
@@ -36,6 +37,24 @@ from app.modules.church_registry.schemas import (
     EligibleChurchMemberListItem,
 )
 
+REGISTRATION_NUMBER_REGEX = re.compile(r"^\d{4}-\d{4}$")
+
+
+def _is_registration_number_unique_violation(exc: BaseException) -> bool:
+    """Detect DB unique violations on church_members.registration_number (PG, SQLite, etc.)."""
+    parts: list[str] = []
+    for e in (exc, getattr(exc, "orig", None), getattr(exc, "__cause__", None)):
+        if e is not None:
+            parts.append(str(e).lower())
+    blob = " ".join(parts)
+    if "uq_church_members_registration_number" in blob:
+        return True
+    if "unique" in blob and "registration_number" in blob:
+        return True
+    if "unique constraint failed" in blob and "registration_number" in blob:
+        return True
+    return False
+
 
 def build_full_name(*, first_name: str, middle_name: str | None, last_name: str) -> str:
     parts = [first_name.strip()]
@@ -54,6 +73,7 @@ def _to_list_item(cm: ChurchMember) -> ChurchMemberListItem:
         full_name=cm.full_name,
         first_name=cm.first_name,
         last_name=cm.last_name,
+        registration_number=cm.registration_number,
         email=contact_email(church_member=cm, linked_user=lu),
         phone=cm.phone,
         membership_status=cm.membership_status,
@@ -162,6 +182,55 @@ async def _ensure_no_duplicate_name_and_dob(
             status_code=status.HTTP_409_CONFLICT,
             detail="A church member with the same name and date of birth already exists",
         )
+
+
+def _validate_registration_number_format(registration_number: str) -> None:
+    if not REGISTRATION_NUMBER_REGEX.fullmatch(registration_number):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration number must use YYYY-XXXX format",
+        )
+
+
+async def _ensure_registration_number_unique(
+    session: AsyncSession,
+    *,
+    registration_number: str,
+    exclude_member_id: uuid.UUID | None = None,
+) -> None:
+    stmt = select(ChurchMember.id).where(ChurchMember.registration_number == registration_number)
+    if exclude_member_id is not None:
+        stmt = stmt.where(ChurchMember.id != exclude_member_id)
+    exists = (await session.execute(stmt.limit(1))).scalar_one_or_none()
+    if exists is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This registration number is already in use.",
+        )
+
+
+async def generate_next_registration_number(
+    session: AsyncSession,
+    *,
+    now: datetime | None = None,
+) -> str:
+    current_year = (now or datetime.now(timezone.utc)).year
+    prefix = f"{current_year}-"
+    stmt = (
+        select(ChurchMember.registration_number)
+        .where(
+            ChurchMember.registration_number.is_not(None),
+            ChurchMember.registration_number.like(f"{prefix}%"),
+        )
+        .order_by(ChurchMember.registration_number.desc())
+        .limit(1)
+    )
+    latest = (await session.execute(stmt)).scalar_one_or_none()
+    next_seq = 1
+    if latest and REGISTRATION_NUMBER_REGEX.fullmatch(latest):
+        _, seq_part = latest.split("-", 1)
+        next_seq = int(seq_part) + 1
+    return f"{current_year}-{next_seq:04d}"
 
 
 async def get_church_member_or_404(session: AsyncSession, member_id: uuid.UUID) -> ChurchMember:
@@ -310,6 +379,29 @@ async def create_church_member(session: AsyncSession, body: ChurchMemberCreate) 
         full_name=full,
         date_of_birth=body.date_of_birth,
     )
+    reg_num = body.registration_number.strip() if body.registration_number else None
+    if reg_num:
+        _validate_registration_number_format(reg_num)
+        await _ensure_registration_number_unique(session, registration_number=reg_num)
+    else:
+        # Best-effort retry for rare race where two creates read same latest value.
+        for _ in range(3):
+            candidate = await generate_next_registration_number(session)
+            existing = (
+                await session.execute(
+                    select(ChurchMember.id)
+                    .where(ChurchMember.registration_number == candidate)
+                    .limit(1),
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                reg_num = candidate
+                break
+        if not reg_num:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Could not allocate a registration number. Please retry.",
+            )
     cm = ChurchMember(
         is_parish_office_record=True,
         first_name=fn,
@@ -325,7 +417,7 @@ async def create_church_member(session: AsyncSession, body: ChurchMemberCreate) 
         occupation=body.occupation.strip() if body.occupation else None,
         marital_status=body.marital_status,
         preferred_language=body.preferred_language.strip() if body.preferred_language else None,
-        registration_number=body.registration_number.strip() if body.registration_number else None,
+        registration_number=reg_num,
         membership_status=body.membership_status,
         is_active=body.is_active,
         joined_at=body.joined_at or datetime.now(timezone.utc),
@@ -358,7 +450,16 @@ async def create_church_member(session: AsyncSession, body: ChurchMemberCreate) 
         notes=body.notes.strip() if body.notes else None,
     )
     session.add(cm)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        if _is_registration_number_unique_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This registration number is already in use.",
+            ) from None
+        raise
     await session.refresh(cm)
     stmt = (
         select(ChurchMember)
@@ -376,6 +477,12 @@ async def patch_church_member(
     body: ChurchMemberPatch,
 ) -> ChurchMemberDetailResponse:
     data = body.model_dump(exclude_unset=True)
+    reg_payload_set = "registration_number" in data
+    if reg_payload_set:
+        reg_raw = data.pop("registration_number")
+    else:
+        reg_raw = None
+
     for key, val in data.items():
         setattr(cm, key, val)
     if "first_name" in data or "middle_name" in data or "last_name" in data:
@@ -387,14 +494,40 @@ async def patch_church_member(
     if cm.is_deceased or cm.membership_status == ChurchMembershipStatus.DECEASED:
         cm.is_deceased = True
         cm.membership_status = ChurchMembershipStatus.DECEASED
-    await session.flush()
-    await _ensure_no_duplicate_name_and_dob(
-        session,
-        full_name=cm.full_name,
-        date_of_birth=cm.date_of_birth,
-        exclude_member_id=cm.id,
-    )
-    await session.commit()
+
+    if reg_payload_set:
+        if reg_raw is None:
+            reg_num = None
+        elif isinstance(reg_raw, str):
+            reg_num = reg_raw.strip() or None
+        else:
+            reg_num = None
+        if reg_num:
+            _validate_registration_number_format(reg_num)
+            await _ensure_registration_number_unique(
+                session,
+                registration_number=reg_num,
+                exclude_member_id=cm.id,
+            )
+        cm.registration_number = reg_num
+
+    try:
+        await session.flush()
+        await _ensure_no_duplicate_name_and_dob(
+            session,
+            full_name=cm.full_name,
+            date_of_birth=cm.date_of_birth,
+            exclude_member_id=cm.id,
+        )
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        if _is_registration_number_unique_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This registration number is already in use.",
+            ) from None
+        raise
     stmt = (
         select(ChurchMember)
         .where(ChurchMember.id == cm.id)
@@ -468,10 +601,24 @@ async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsRespons
     total = await _count_registry(session)
     active_members = await _count_registry(
         session,
-        ChurchMember.is_active.is_(True),
-        ChurchMember.is_deceased.is_(False),
+        ChurchMember.membership_status == ChurchMembershipStatus.ACTIVE,
     )
-    deceased_members = await _count_registry(session, ChurchMember.is_deceased.is_(True))
+    inactive_members = await _count_registry(
+        session,
+        ChurchMember.membership_status == ChurchMembershipStatus.INACTIVE,
+    )
+    visitor_members = await _count_registry(
+        session,
+        ChurchMember.membership_status == ChurchMembershipStatus.VISITOR,
+    )
+    transferred_members = await _count_registry(
+        session,
+        ChurchMember.membership_status == ChurchMembershipStatus.TRANSFERRED,
+    )
+    deceased_members = await _count_registry(
+        session,
+        ChurchMember.membership_status == ChurchMembershipStatus.DECEASED,
+    )
 
     male_members = await _count_registry(session, ChurchMember.gender == Gender.MALE)
     female_members = await _count_registry(session, ChurchMember.gender == Gender.FEMALE)
@@ -533,6 +680,9 @@ async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsRespons
     return ChurchMemberStatsResponse(
         total_members=total,
         active_members=active_members,
+        inactive_members=inactive_members,
+        visitor_members=visitor_members,
+        transferred_members=transferred_members,
         deceased_members=deceased_members,
         male_members=male_members,
         female_members=female_members,
