@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -9,8 +10,12 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy import func, select
 
 from app.db.models.church_member import ChurchMember
-from app.db.models.enums import UserRole
+from app.db.models.enums import RegistryAgeGroup, UserRole
 from app.modules.auth import service as auth_service
+from app.modules.church_registry.registry_age import (
+    dob_inclusive_range_for_age_group,
+    stats_reference_date,
+)
 
 
 async def _promote_to_admin(session_factory: async_sessionmaker, email: str) -> None:
@@ -193,6 +198,20 @@ async def test_church_member_stats_shape(
     assert "members_without_accounts" in s0
     assert "gender_distribution" in s0
     assert "age_groups" in s0
+    for key in (
+        "male_members",
+        "female_members",
+        "children_members",
+        "young_adult_members",
+        "adult_members",
+        "baptized_members",
+        "confirmed_members",
+        "communicant_members",
+        "married_members",
+        "single_members",
+    ):
+        assert key in s0
+    assert set(s0["age_groups"].keys()) >= {"child", "young_adult", "adult", "unknown"}
     before_total = s0["total_members"]
 
     await client.post(
@@ -209,3 +228,81 @@ async def test_church_member_stats_shape(
     s1 = r1.json()
     assert s1["total_members"] == before_total + 1
     assert s1["members_without_accounts"] == s0["members_without_accounts"] + 1
+
+
+@pytest.mark.asyncio
+async def test_church_member_list_filters_age_group_and_sacraments(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "filteradmin@example.com")
+    await _promote_to_admin(session_factory, "filteradmin@example.com")
+    tok = await _login(client, "filteradmin@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    ref = stats_reference_date()
+    c_lo, c_hi = dob_inclusive_range_for_age_group(RegistryAgeGroup.CHILD, ref)
+    assert c_lo is not None and c_hi is not None
+    child_dob = c_lo + timedelta(days=max(1, (c_hi - c_lo).days // 2))
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Filter",
+            "last_name": "ChildMaleBap",
+            "gender": "male",
+            "date_of_birth": child_dob.isoformat(),
+            "is_baptized": True,
+            "is_confirmed": False,
+            "is_communicant": False,
+            "is_married": False,
+        },
+    )
+    ya_lo, ya_hi = dob_inclusive_range_for_age_group(RegistryAgeGroup.YOUNG_ADULT, ref)
+    assert ya_lo is not None and ya_hi is not None
+    ya_dob = ya_lo + timedelta(days=max(1, (ya_hi - ya_lo).days // 2))
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Filter",
+            "last_name": "YoungFemale",
+            "gender": "female",
+            "date_of_birth": ya_dob.isoformat(),
+            "is_baptized": False,
+            "is_confirmed": True,
+            "is_communicant": True,
+            "is_married": False,
+        },
+    )
+
+    lr = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={"age_group": "child", "gender": "male", "is_baptized": "true", "page_size": 50},
+    )
+    assert lr.status_code == 200, lr.text
+    names = {it["last_name"] for it in lr.json()["items"]}
+    assert "ChildMaleBap" in names
+    assert "YoungFemale" not in names
+
+    lr2 = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={"age_group": "young_adult", "is_confirmed": "true", "page_size": 50},
+    )
+    assert lr2.status_code == 200, lr2.text
+    names2 = {it["last_name"] for it in lr2.json()["items"]}
+    assert "YoungFemale" in names2
+
+
+@pytest.mark.asyncio
+async def test_church_members_list_forbidden_for_non_admin(client: AsyncClient) -> None:
+    await _register(client, "nomemlist@example.com")
+    tok = await _login(client, "nomemlist@example.com")
+    r = await client.get(
+        "/api/v1/church-members/",
+        headers={"Authorization": f"Bearer {tok}"},
+    )
+    assert r.status_code == 403, r.text

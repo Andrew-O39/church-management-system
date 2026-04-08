@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
@@ -13,7 +13,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.db.models.church_event import ChurchEvent
 from app.db.models.church_member import ChurchMember
-from app.db.models.enums import ChurchMembershipStatus
+from app.db.models.enums import ChurchMembershipStatus, Gender, RegistryAgeGroup
 from app.db.models.ministry_membership import MinistryMembership
 from app.db.models.user import User
 from app.modules.auth import service as auth_service
@@ -21,6 +21,10 @@ from app.modules.church_registry.person_display import (
     contact_email,
     linked_account_fields,
     normalize_full_name_key,
+)
+from app.modules.church_registry.registry_age import (
+    dob_inclusive_range_for_age_group,
+    stats_reference_date,
 )
 from app.modules.church_registry.schemas import (
     ChurchMemberCreate,
@@ -172,12 +176,23 @@ async def get_church_member_or_404(session: AsyncSession, member_id: uuid.UUID) 
     return cm
 
 
-def _church_member_filter_exprs(
+def church_member_registry_filter_exprs(
     *,
     search: str | None,
     membership_status: ChurchMembershipStatus | None,
     is_active: bool | None,
     is_deceased: bool | None,
+    gender: Gender | None = None,
+    is_baptized: bool | None = None,
+    is_confirmed: bool | None = None,
+    is_communicant: bool | None = None,
+    is_married: bool | None = None,
+    age_group: RegistryAgeGroup | None = None,
+    age_ref: date | None = None,
+    joined_from: date | None = None,
+    joined_to: date | None = None,
+    deceased_from: date | None = None,
+    deceased_to: date | None = None,
 ) -> list:
     exprs: list = [ChurchMember.is_parish_office_record.is_(True)]
     if search and search.strip():
@@ -193,6 +208,36 @@ def _church_member_filter_exprs(
         exprs.append(ChurchMember.is_active.is_(is_active))
     if is_deceased is not None:
         exprs.append(ChurchMember.is_deceased.is_(is_deceased))
+    if gender is not None:
+        exprs.append(ChurchMember.gender == gender)
+    if is_baptized is not None:
+        exprs.append(ChurchMember.is_baptized.is_(is_baptized))
+    if is_confirmed is not None:
+        exprs.append(ChurchMember.is_confirmed.is_(is_confirmed))
+    if is_communicant is not None:
+        exprs.append(ChurchMember.is_communicant.is_(is_communicant))
+    if is_married is not None:
+        exprs.append(ChurchMember.is_married.is_(is_married))
+    if age_group is not None:
+        ref = age_ref or stats_reference_date()
+        rng = dob_inclusive_range_for_age_group(age_group, ref)
+        if rng is not None:
+            lo, hi = rng
+            exprs.append(ChurchMember.date_of_birth.is_not(None))
+            exprs.append(ChurchMember.date_of_birth >= lo)
+            exprs.append(ChurchMember.date_of_birth <= hi)
+    if joined_from is not None:
+        jf = datetime.combine(joined_from, time.min, tzinfo=timezone.utc)
+        exprs.append(ChurchMember.joined_at >= jf)
+    if joined_to is not None:
+        jt = datetime.combine(joined_to, time(23, 59, 59, 999999), tzinfo=timezone.utc)
+        exprs.append(ChurchMember.joined_at <= jt)
+    if deceased_from is not None:
+        exprs.append(ChurchMember.date_of_death.is_not(None))
+        exprs.append(ChurchMember.date_of_death >= deceased_from)
+    if deceased_to is not None:
+        exprs.append(ChurchMember.date_of_death.is_not(None))
+        exprs.append(ChurchMember.date_of_death <= deceased_to)
     return exprs
 
 
@@ -203,14 +248,35 @@ async def list_church_members(
     membership_status: ChurchMembershipStatus | None,
     is_active: bool | None,
     is_deceased: bool | None,
+    gender: Gender | None = None,
+    is_baptized: bool | None = None,
+    is_confirmed: bool | None = None,
+    is_communicant: bool | None = None,
+    is_married: bool | None = None,
+    age_group: RegistryAgeGroup | None = None,
+    joined_from: date | None = None,
+    joined_to: date | None = None,
+    deceased_from: date | None = None,
+    deceased_to: date | None = None,
     page: int,
     page_size: int,
 ) -> ChurchMemberListResponse:
-    exprs = _church_member_filter_exprs(
+    exprs = church_member_registry_filter_exprs(
         search=search,
         membership_status=membership_status,
         is_active=is_active,
         is_deceased=is_deceased,
+        gender=gender,
+        is_baptized=is_baptized,
+        is_confirmed=is_confirmed,
+        is_communicant=is_communicant,
+        is_married=is_married,
+        age_group=age_group,
+        age_ref=stats_reference_date(),
+        joined_from=joined_from,
+        joined_to=joined_to,
+        deceased_from=deceased_from,
+        deceased_to=deceased_to,
     )
     count_stmt = select(func.count()).select_from(ChurchMember)
     if exprs:
@@ -386,51 +452,59 @@ async def link_user_to_member(
     return detail
 
 
-def _age_bucket(dob: date | None) -> str:
-    if dob is None:
-        return "unknown"
-    today = date.today()
-    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-    if age < 13:
-        return "child"
-    if age < 18:
-        return "youth"
-    if age < 65:
-        return "adult"
-    return "senior"
+async def _count_registry(
+    session: AsyncSession,
+    *conditions: object,
+) -> int:
+    parish_only = ChurchMember.is_parish_office_record.is_(True)
+    stmt = select(func.count()).select_from(ChurchMember).where(parish_only, *conditions)
+    return int((await session.execute(stmt)).scalar_one())
 
 
 async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsResponse:
+    ref = stats_reference_date()
     parish_only = ChurchMember.is_parish_office_record.is_(True)
-    total = int(
-        (
-            await session.execute(
-                select(func.count()).select_from(ChurchMember).where(parish_only),
-            )
-        ).scalar_one()
+
+    total = await _count_registry(session)
+    active_members = await _count_registry(
+        session,
+        ChurchMember.is_active.is_(True),
+        ChurchMember.is_deceased.is_(False),
     )
-    active_members = int(
-        (
-            await session.execute(
-                select(func.count())
-                .select_from(ChurchMember)
-                .where(
-                    parish_only,
-                    ChurchMember.is_active.is_(True),
-                    ChurchMember.is_deceased.is_(False),
-                ),
-            )
-        ).scalar_one()
+    deceased_members = await _count_registry(session, ChurchMember.is_deceased.is_(True))
+
+    male_members = await _count_registry(session, ChurchMember.gender == Gender.MALE)
+    female_members = await _count_registry(session, ChurchMember.gender == Gender.FEMALE)
+
+    c_lo, c_hi = dob_inclusive_range_for_age_group(RegistryAgeGroup.CHILD, ref)
+    ya_lo, ya_hi = dob_inclusive_range_for_age_group(RegistryAgeGroup.YOUNG_ADULT, ref)
+    ad_lo, ad_hi = dob_inclusive_range_for_age_group(RegistryAgeGroup.ADULT, ref)
+
+    children_members = await _count_registry(
+        session,
+        ChurchMember.date_of_birth.is_not(None),
+        ChurchMember.date_of_birth >= c_lo,
+        ChurchMember.date_of_birth <= c_hi,
     )
-    deceased_members = int(
-        (
-            await session.execute(
-                select(func.count())
-                .select_from(ChurchMember)
-                .where(parish_only, ChurchMember.is_deceased.is_(True)),
-            )
-        ).scalar_one()
+    young_adult_members = await _count_registry(
+        session,
+        ChurchMember.date_of_birth.is_not(None),
+        ChurchMember.date_of_birth >= ya_lo,
+        ChurchMember.date_of_birth <= ya_hi,
     )
+    adult_members = await _count_registry(
+        session,
+        ChurchMember.date_of_birth.is_not(None),
+        ChurchMember.date_of_birth >= ad_lo,
+        ChurchMember.date_of_birth <= ad_hi,
+    )
+
+    baptized_members = await _count_registry(session, ChurchMember.is_baptized.is_(True))
+    confirmed_members = await _count_registry(session, ChurchMember.is_confirmed.is_(True))
+    communicant_members = await _count_registry(session, ChurchMember.is_communicant.is_(True))
+    married_members = await _count_registry(session, ChurchMember.is_married.is_(True))
+    single_members = await _count_registry(session, ChurchMember.is_married.is_(False))
+
     with_accounts = int(
         (
             await session.execute(
@@ -449,15 +523,27 @@ async def church_member_stats(session: AsyncSession) -> ChurchMemberStatsRespons
     )
     gender_distribution = {g.value: int(c) for g, c in gender_q.all()}
 
-    dob_rows = (await session.execute(select(ChurchMember.date_of_birth).where(parish_only))).all()
-    age_groups: dict[str, int] = {"child": 0, "youth": 0, "adult": 0, "senior": 0, "unknown": 0}
-    for (dob,) in dob_rows:
-        age_groups[_age_bucket(dob)] += 1
+    age_groups = {
+        "child": children_members,
+        "young_adult": young_adult_members,
+        "adult": adult_members,
+        "unknown": await _count_registry(session, ChurchMember.date_of_birth.is_(None)),
+    }
 
     return ChurchMemberStatsResponse(
         total_members=total,
         active_members=active_members,
         deceased_members=deceased_members,
+        male_members=male_members,
+        female_members=female_members,
+        children_members=children_members,
+        young_adult_members=young_adult_members,
+        adult_members=adult_members,
+        baptized_members=baptized_members,
+        confirmed_members=confirmed_members,
+        communicant_members=communicant_members,
+        married_members=married_members,
+        single_members=single_members,
         gender_distribution=gender_distribution,
         age_groups=age_groups,
         members_with_accounts=with_accounts,

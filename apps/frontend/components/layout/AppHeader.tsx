@@ -90,7 +90,9 @@ export default function AppHeader() {
   };
 
   return (
-    <header className="border-b border-slate-200/90 bg-white shadow-sm shadow-slate-900/[0.03]">
+    <header
+      className="shepherd-app-header border-b border-slate-200/90 bg-white shadow-sm shadow-slate-900/[0.03]"
+    >
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex min-w-0 flex-col gap-1">
           <Link
@@ -164,6 +166,20 @@ export default function AppHeader() {
                 <>
                   <NavLink href="/dashboard" active={pathname === "/dashboard"}>
                     Dashboard
+                  </NavLink>
+                  <NavLink
+                    href="/exports"
+                    active={pathname === "/exports" || pathname.startsWith("/exports/")}
+                  >
+                    Exports
+                  </NavLink>
+                  <NavLink
+                    href="/settings/church"
+                    active={
+                      pathname === "/settings/church" || pathname.startsWith("/settings/church/")
+                    }
+                  >
+                    Church settings
                   </NavLink>
                   <NavLink
                     href="/members"

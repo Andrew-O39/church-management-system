@@ -8,6 +8,11 @@ export type ApiError = {
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+/** Base URL for constructing raw fetch URLs (e.g. CSV downloads). */
+export function getApiBaseUrl(): string {
+  return apiBaseUrl;
+}
+
 function normalizeErrorDetail(raw: unknown): string | undefined {
   if (typeof raw === "string") return raw;
   if (Array.isArray(raw) && raw.length > 0) {
@@ -69,5 +74,47 @@ export async function apiFetch<T>(
     return undefined as T;
   }
   return JSON.parse(text) as T;
+}
+
+function filenameFromContentDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted?.[1]) return quoted[1].trim();
+  const plain = /filename=([^;\s]+)/i.exec(header);
+  if (plain?.[1]) return plain[1].replace(/^UTF-8''/i, "").trim();
+  return undefined;
+}
+
+export type ApiFetchBlobResult = {
+  blob: Blob;
+  /** From `Content-Disposition` when present. */
+  filename?: string;
+};
+
+/** GET binary/text response (e.g. CSV) with optional Bearer token. */
+export async function apiFetchBlob(
+  path: string,
+  init?: { token?: string | null; params?: Record<string, string | undefined> },
+): Promise<ApiFetchBlobResult> {
+  const token = init && "token" in init ? init.token : getAccessToken();
+  let url = buildUrl(path);
+  if (init?.params) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(init.params)) {
+      if (v !== undefined && v !== "") qs.set(k, v);
+    }
+    const q = qs.toString();
+    if (q) url += (url.includes("?") ? "&" : "?") + q;
+  }
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { method: "GET", headers, cache: "no-store" });
+  if (!res.ok) {
+    const err: ApiError = { status: res.status, detail: await res.text().catch(() => undefined) };
+    throw err;
+  }
+  const blob = await res.blob();
+  const filename = filenameFromContentDisposition(res.headers.get("content-disposition"));
+  return { blob, filename };
 }
 

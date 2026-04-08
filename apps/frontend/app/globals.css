@@ -29,3 +29,50 @@
     @apply text-xl font-bold tracking-tight text-slate-900;
   }
 }
+
+/* Admin export print / Save as PDF — only when /exports/print sets data-print-export */
+@media print {
+  html[data-print-export="1"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html[data-print-export="1"] body {
+    background: white !important;
+  }
+
+  /* Site nav only — do NOT use bare `header` (export document uses <header> for sections). */
+  html[data-print-export="1"] .shepherd-app-header {
+    display: none !important;
+  }
+
+  html[data-print-export="1"] .no-print {
+    display: none !important;
+  }
+
+  html[data-print-export="1"] main {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  html[data-print-export="1"] .print-export-document {
+    margin: 0 !important;
+    max-width: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    padding: 0.5in !important;
+  }
+
+  html[data-print-export="1"] .print-export-document table {
+    font-size: 10pt;
+    width: 100%;
+  }
+
+  html[data-print-export="1"] .print-export-document th,
+  html[data-print-export="1"] .print-export-document td {
+    padding: 0.35rem 0.5rem !important;
+  }
+}

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.enums import ChurchMembershipStatus, UserRole
+from app.db.models.enums import ChurchMembershipStatus, Gender, RegistryAgeGroup, UserRole
 from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
@@ -63,6 +64,16 @@ async def list_church_members(
     membership_status: ChurchMembershipStatus | None = Query(default=None),
     is_active: bool | None = Query(default=None),
     is_deceased: bool | None = Query(default=None),
+    gender: Gender | None = Query(default=None),
+    is_baptized: bool | None = Query(default=None),
+    is_confirmed: bool | None = Query(default=None),
+    is_communicant: bool | None = Query(default=None),
+    is_married: bool | None = Query(default=None),
+    age_group: RegistryAgeGroup | None = Query(default=None),
+    joined_from: date | None = Query(default=None),
+    joined_to: date | None = Query(default=None),
+    deceased_from: date | None = Query(default=None),
+    deceased_to: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=_MAX_PAGE_SIZE),
 ) -> ChurchMemberListResponse:
@@ -72,6 +83,16 @@ async def list_church_members(
         membership_status=membership_status,
         is_active=is_active,
         is_deceased=is_deceased,
+        gender=gender,
+        is_baptized=is_baptized,
+        is_confirmed=is_confirmed,
+        is_communicant=is_communicant,
+        is_married=is_married,
+        age_group=age_group,
+        joined_from=joined_from,
+        joined_to=joined_to,
+        deceased_from=deceased_from,
+        deceased_to=deceased_to,
         page=page,
         page_size=page_size,
     )

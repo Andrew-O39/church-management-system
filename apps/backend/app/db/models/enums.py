@@ -60,6 +60,14 @@ class Gender(str, enum.Enum):
     PREFER_NOT_TO_SAY = "prefer_not_to_say"
 
 
+class RegistryAgeGroup(str, enum.Enum):
+    """Parish registry list/export filter — derived from date_of_birth vs UTC today."""
+
+    CHILD = "child"  # 0–12
+    YOUNG_ADULT = "young_adult"  # 13–17
+    ADULT = "adult"  # 18+
+
+
 class ChurchMembershipStatus(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"

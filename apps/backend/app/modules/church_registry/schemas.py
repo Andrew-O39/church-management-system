@@ -184,6 +184,16 @@ class ChurchMemberStatsResponse(BaseModel):
     total_members: int
     active_members: int
     deceased_members: int
+    male_members: int
+    female_members: int
+    children_members: int
+    young_adult_members: int
+    adult_members: int
+    baptized_members: int
+    confirmed_members: int
+    communicant_members: int
+    married_members: int
+    single_members: int
     gender_distribution: dict[str, int]
     age_groups: dict[str, int]
     members_with_accounts: int

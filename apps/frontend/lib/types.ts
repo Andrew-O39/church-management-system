@@ -383,15 +383,30 @@ export type ChurchMemberDetailResponse = {
   updated_at: string;
 };
 
+/** GET /api/v1/church-members/stats — parish-office records only (no app-user joins in headline counts). */
 export type ChurchMemberStatsResponse = {
   total_members: number;
   active_members: number;
   deceased_members: number;
+  male_members: number;
+  female_members: number;
+  children_members: number;
+  young_adult_members: number;
+  adult_members: number;
+  baptized_members: number;
+  confirmed_members: number;
+  communicant_members: number;
+  married_members: number;
+  single_members: number;
   gender_distribution: Record<string, number>;
+  /** child | young_adult | adult | unknown (DOB missing) — ages per registry_age rules */
   age_groups: Record<string, number>;
   members_with_accounts: number;
   members_without_accounts: number;
 };
+
+/** GET /api/v1/church-members/?age_group= — derived from date_of_birth vs UTC today */
+export type RegistryAgeGroup = "child" | "young_adult" | "adult";
 
 /** POST /api/v1/church-members/ — body matches backend ChurchMemberCreate */
 export type ChurchMemberCreateBody = {
@@ -706,5 +721,41 @@ export type NotificationInsightsResponse = {
   sms_failed: number;
   whatsapp_attempted: number;
   whatsapp_failed: number;
+};
+
+// --- Church profile (Step 16.1) — admin-only singleton ---
+
+export type ChurchProfileResponse = {
+  id: string | null;
+  church_name: string;
+  short_name: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ChurchProfileUpdateRequest = {
+  church_name: string;
+  short_name?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
+// --- Admin exports (Step 16) — print payload from GET .../print ---
+
+export type PrintExportPayload = {
+  title: string;
+  subtitle: string | null;
+  columns: string[];
+  rows: (string | number | boolean | null)[][];
+  generated_at: string;
+  church_name?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  filters_summary?: string | null;
 };
 

@@ -14,6 +14,7 @@ from app.db.models.notification_delivery_attempt import NotificationDeliveryAtte
 from app.db.models.notification_recipient import NotificationRecipient
 from app.db.models.event_reminder_rule import EventReminderRule
 from app.db.models.event_reminder_run import EventReminderRun
+from app.db.models.church_profile import ChurchProfile
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "NotificationRecipient",
     "EventReminderRule",
     "EventReminderRun",
+    "ChurchProfile",
 ]
