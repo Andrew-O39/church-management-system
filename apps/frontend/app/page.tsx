@@ -20,66 +20,71 @@ function FeatureCard({
 
 export default function HomePage() {
   return (
-    <section className="mx-auto max-w-6xl space-y-16 py-10 sm:py-16">
-      <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-        <div className="space-y-6">
-          <div className="inline-flex items-center gap-3 rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-800 shadow-sm">
-            <ShepherdLogo className="h-8 w-8" />
-            Shepherd
+    <section className="mx-auto max-w-6xl space-y-20 pt-4 pb-12 sm:pt-6 sm:pb-20">
+      <div className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+        <div className="space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="rounded-3xl border border-indigo-200 bg-white p-3 shadow-sm">
+              <ShepherdLogo className="h-14 w-14 sm:h-16 sm:w-16" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-700">
+                Shepherd
+              </p>
+              <p className="text-sm text-slate-600">Church management workspace</p>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Care for your church community with clarity and confidence.
+          <div className="space-y-5">
+            <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+              Serve and care for your parish with clarity, order, and trust.
             </h1>
-            <p className="max-w-2xl text-lg leading-relaxed text-slate-700">
-              Shepherd helps your church manage app users, events, volunteers, attendance, reminders,
-              and communication in one calm, organised workspace.
+            <p className="max-w-2xl text-lg leading-relaxed text-slate-700 sm:text-xl">
+              Shepherd helps your church care for its people by bringing together official parish
+              records, events, volunteers, attendance, and communication in one calm and organised
+              workspace.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <Link href="/login" className={`${btnPrimary} px-6 py-3 text-base shadow-md shadow-indigo-900/20`}>
-              Sign in
-            </Link>
-            <Link href="/register" className={`${btnSecondary} px-6 py-3 text-base`}>
-              Create account
-            </Link>
-          </div>
-
-          <div className="flex flex-wrap gap-2 pt-1 text-sm">
+          <div className="flex flex-wrap gap-2 text-sm">
             <span className={notificationChannelClass("in_app")}>In-app notifications</span>
             <span className={notificationChannelClass("sms")}>SMS messaging</span>
             <span className={notificationChannelClass("whatsapp")}>WhatsApp messaging</span>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-300/90 bg-white p-6 shadow-lg shadow-slate-900/[0.06] ring-1 ring-slate-200/70">
+        <div className="rounded-[2rem] border border-slate-300/90 bg-white p-7 shadow-lg shadow-slate-900/[0.06] ring-1 ring-slate-200/70">
           <div className="space-y-5">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">Why Shepherd</p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">Built for churches that want to stay connected.</h2>
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">
+                Why Shepherd
+              </p>
+              <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                Built for churches that want to stay connected and keep faithful records.
+              </h2>
             </div>
 
             <div className="space-y-4">
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-900">Keep everyone organised</p>
+                <p className="text-sm font-semibold text-slate-900">Keep parish life organised</p>
                 <p className="mt-1 text-sm leading-relaxed text-slate-700">
-                  Manage events, ministries, volunteers, and reminders without losing track of people.
+                  Manage events, ministries, volunteers, and reminders without losing track of
+                  people.
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Preserve official records</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                  Preserve your parish registry records for membership, sacraments, and administration
+                  with care.
                 </p>
               </div>
 
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-900">Communicate clearly</p>
                 <p className="mt-1 text-sm leading-relaxed text-slate-700">
-                  Send messages in-app, by SMS, or by WhatsApp to the right app users at the right time.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-900">Stay prepared</p>
-                <p className="mt-1 text-sm leading-relaxed text-slate-700">
-                  Schedule reminders before events so volunteers and participants are not left behind.
+                  Reach the right people through in-app messages, SMS, and WhatsApp when needed.
                 </p>
               </div>
             </div>
@@ -91,15 +96,15 @@ export default function HomePage() {
         <div className="space-y-2">
           <h2 className="shepherd-section-title">Everything your church needs to stay coordinated</h2>
           <p className="max-w-3xl text-base leading-relaxed text-slate-700">
-            Shepherd keeps your operational work focused on app users while preserving a separate parish
-            registry for archival church records.
+            Shepherd supports both the daily life of the parish and the careful keeping of its
+            records, helping your church serve people well without losing sight of its history.
           </p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <FeatureCard
-            title="App users"
-            description="Manage the people who use the app, update their details, and keep account records organised."
+            title="Parish registry"
+            description="Keep official church records for membership, sacraments, demographics, and parish administration."
           />
           <FeatureCard
             title="Events and reminders"

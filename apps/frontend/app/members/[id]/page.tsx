@@ -287,11 +287,16 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
       description="Official parish registry record. App login accounts are separate from this list."
     >
       <div className="mb-4 flex flex-wrap justify-between gap-2">
-        <Link href="/members" className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
+        <Link
+          href="/members"
+          className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+        >
           ← Parish registry
         </Link>
-        {d?.church_member_id ? (
-          <span className="text-xs text-slate-500">ID: {d.church_member_id}</span>
+        {d?.registration_number ? (
+          <span className="text-xs text-slate-500">
+            Reg #: {d.registration_number}
+          </span>
         ) : null}
       </div>
 
@@ -313,7 +318,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
       {d && isAdmin ? (
         <div className="space-y-4">
           <form onSubmit={onSave} className="space-y-4">
-            <ContentCard className="space-y-6">
+            <ContentCard className="space-y-8">
               {success ? (
                 <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
                   Saved.
@@ -324,7 +329,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
               ) : null}
 
               <section>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Identity</h3>
+                <h3 className="mb-4 text-base font-bold text-slate-900">Identity</h3>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-800">First name</label>
@@ -482,7 +487,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
               </section>
 
               <section className="border-t border-slate-100 pt-6">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Sacramental</h3>
+                <h3 className="mb-4 text-base font-bold text-slate-900">Sacramental</h3>
                 <div className="grid gap-4 md:grid-cols-3">
                   <label className="flex items-center gap-2 md:col-span-3">
                     <input
@@ -592,7 +597,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
               </section>
 
               <section className="border-t border-slate-100 pt-6">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Family / contacts</h3>
+                <h3 className="mb-4 text-base font-bold text-slate-900">Family / contacts</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-800">Spouse name</label>
@@ -638,7 +643,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
               </section>
 
               <section className="border-t border-slate-100 pt-6">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Death / memorial</h3>
+                <h3 className="mb-4 text-base font-bold text-slate-900">Death / memorial</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex items-center gap-2 md:col-span-2">
                     <input
@@ -687,7 +692,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
               </section>
 
               <section className="border-t border-slate-100 pt-6">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Notes</h3>
+                <h3 className="mb-4 text-base font-bold text-slate-900">Notes</h3>
                 <textarea
                   value={d.notes ?? ""}
                   onChange={(e) => setField("notes", e.target.value || null)}
@@ -695,7 +700,7 @@ export default function ChurchMemberDetailPage({ params }: { params: { id: strin
                 />
               </section>
 
-              <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-6">
+              <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-md backdrop-blur">
                 <button
                   type="submit"
                   disabled={!patchPreview || submitting}

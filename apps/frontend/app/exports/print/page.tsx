@@ -135,6 +135,9 @@ function PrintExportInner() {
     );
   }
 
+  const backHref = kind === "parish-registry" ? "/members" : "/exports";
+  const backLabel = kind === "parish-registry" ? "Back to parish registry" : "Back to exports";
+
   return (
     <div className="space-y-6">
       {/* Screen-only chrome — hidden via .no-print in globals.css @media print */}
@@ -142,8 +145,8 @@ function PrintExportInner() {
         <button type="button" className={btnPrimary} onClick={() => window.print()}>
           Print or save as PDF
         </button>
-        <Link href="/exports" className={btnSecondary}>
-          Back to exports
+        <Link href={backHref} className={btnSecondary}>
+          {backLabel}
         </Link>
       </div>
 

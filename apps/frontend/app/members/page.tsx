@@ -57,6 +57,14 @@ type FilterState = {
   joinedTo: string;
   deceasedFrom: string;
   deceasedTo: string;
+  baptismDateFrom: string;
+  baptismDateTo: string;
+  firstCommunionDateFrom: string;
+  firstCommunionDateTo: string;
+  confirmationDateFrom: string;
+  confirmationDateTo: string;
+  marriageDateFrom: string;
+  marriageDateTo: string;
 };
 
 const emptyFilters = (): FilterState => ({
@@ -74,6 +82,14 @@ const emptyFilters = (): FilterState => ({
   joinedTo: "",
   deceasedFrom: "",
   deceasedTo: "",
+  baptismDateFrom: "",
+  baptismDateTo: "",
+  firstCommunionDateFrom: "",
+  firstCommunionDateTo: "",
+  confirmationDateFrom: "",
+  confirmationDateTo: "",
+  marriageDateFrom: "",
+  marriageDateTo: "",
 });
 
 function triStateParam(v: string): boolean | undefined {
@@ -103,6 +119,14 @@ function appendRegistryListParams(p: URLSearchParams, a: FilterState) {
   if (a.joinedTo) p.set("joined_to", a.joinedTo);
   if (a.deceasedFrom) p.set("deceased_from", a.deceasedFrom);
   if (a.deceasedTo) p.set("deceased_to", a.deceasedTo);
+  if (a.baptismDateFrom) p.set("baptism_date_from", a.baptismDateFrom);
+  if (a.baptismDateTo) p.set("baptism_date_to", a.baptismDateTo);
+  if (a.firstCommunionDateFrom) p.set("first_communion_date_from", a.firstCommunionDateFrom);
+  if (a.firstCommunionDateTo) p.set("first_communion_date_to", a.firstCommunionDateTo);
+  if (a.confirmationDateFrom) p.set("confirmation_date_from", a.confirmationDateFrom);
+  if (a.confirmationDateTo) p.set("confirmation_date_to", a.confirmationDateTo);
+  if (a.marriageDateFrom) p.set("marriage_date_from", a.marriageDateFrom);
+  if (a.marriageDateTo) p.set("marriage_date_to", a.marriageDateTo);
 }
 
 /** Same query shape as GET /exports/parish-registry.csv */
@@ -127,6 +151,14 @@ function registryExportParams(a: FilterState): Record<string, string> {
   if (a.joinedTo) o.joined_to = a.joinedTo;
   if (a.deceasedFrom) o.deceased_from = a.deceasedFrom;
   if (a.deceasedTo) o.deceased_to = a.deceasedTo;
+  if (a.baptismDateFrom) o.baptism_date_from = a.baptismDateFrom;
+  if (a.baptismDateTo) o.baptism_date_to = a.baptismDateTo;
+  if (a.firstCommunionDateFrom) o.first_communion_date_from = a.firstCommunionDateFrom;
+  if (a.firstCommunionDateTo) o.first_communion_date_to = a.firstCommunionDateTo;
+  if (a.confirmationDateFrom) o.confirmation_date_from = a.confirmationDateFrom;
+  if (a.confirmationDateTo) o.confirmation_date_to = a.confirmationDateTo;
+  if (a.marriageDateFrom) o.marriage_date_from = a.marriageDateFrom;
+  if (a.marriageDateTo) o.marriage_date_to = a.marriageDateTo;
   return o;
 }
 
@@ -528,6 +560,135 @@ export default function ParishRegistryListPage() {
                   <option value="false">No (single)</option>
                 </select>
               </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <h3 className="text-sm font-semibold text-slate-800">Sacramental dates</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Filters use the recorded date fields only. Rows without a date are excluded when a
+                range is set.
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Baptism date
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>From</label>
+                      <input
+                        type="date"
+                        value={filters.baptismDateFrom}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, baptismDateFrom: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>To</label>
+                      <input
+                        type="date"
+                        value={filters.baptismDateTo}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, baptismDateTo: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    First communion date
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>From</label>
+                      <input
+                        type="date"
+                        value={filters.firstCommunionDateFrom}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, firstCommunionDateFrom: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>To</label>
+                      <input
+                        type="date"
+                        value={filters.firstCommunionDateTo}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, firstCommunionDateTo: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Confirmation date
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>From</label>
+                      <input
+                        type="date"
+                        value={filters.confirmationDateFrom}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, confirmationDateFrom: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>To</label>
+                      <input
+                        type="date"
+                        value={filters.confirmationDateTo}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, confirmationDateTo: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Marriage date
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>From</label>
+                      <input
+                        type="date"
+                        value={filters.marriageDateFrom}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, marriageDateFrom: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={fieldLabel}>To</label>
+                      <input
+                        type="date"
+                        value={filters.marriageDateTo}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, marriageDateTo: e.target.value }))
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-1.5">
                 <label className={fieldLabel}>Joined from</label>
                 <input

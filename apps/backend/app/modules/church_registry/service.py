@@ -262,6 +262,14 @@ def church_member_registry_filter_exprs(
     joined_to: date | None = None,
     deceased_from: date | None = None,
     deceased_to: date | None = None,
+    baptism_date_from: date | None = None,
+    baptism_date_to: date | None = None,
+    confirmation_date_from: date | None = None,
+    confirmation_date_to: date | None = None,
+    first_communion_date_from: date | None = None,
+    first_communion_date_to: date | None = None,
+    marriage_date_from: date | None = None,
+    marriage_date_to: date | None = None,
 ) -> list:
     exprs: list = [ChurchMember.is_parish_office_record.is_(True)]
     if search and search.strip():
@@ -307,6 +315,30 @@ def church_member_registry_filter_exprs(
     if deceased_to is not None:
         exprs.append(ChurchMember.date_of_death.is_not(None))
         exprs.append(ChurchMember.date_of_death <= deceased_to)
+    if baptism_date_from is not None:
+        exprs.append(ChurchMember.baptism_date.is_not(None))
+        exprs.append(ChurchMember.baptism_date >= baptism_date_from)
+    if baptism_date_to is not None:
+        exprs.append(ChurchMember.baptism_date.is_not(None))
+        exprs.append(ChurchMember.baptism_date <= baptism_date_to)
+    if confirmation_date_from is not None:
+        exprs.append(ChurchMember.confirmation_date.is_not(None))
+        exprs.append(ChurchMember.confirmation_date >= confirmation_date_from)
+    if confirmation_date_to is not None:
+        exprs.append(ChurchMember.confirmation_date.is_not(None))
+        exprs.append(ChurchMember.confirmation_date <= confirmation_date_to)
+    if first_communion_date_from is not None:
+        exprs.append(ChurchMember.first_communion_date.is_not(None))
+        exprs.append(ChurchMember.first_communion_date >= first_communion_date_from)
+    if first_communion_date_to is not None:
+        exprs.append(ChurchMember.first_communion_date.is_not(None))
+        exprs.append(ChurchMember.first_communion_date <= first_communion_date_to)
+    if marriage_date_from is not None:
+        exprs.append(ChurchMember.marriage_date.is_not(None))
+        exprs.append(ChurchMember.marriage_date >= marriage_date_from)
+    if marriage_date_to is not None:
+        exprs.append(ChurchMember.marriage_date.is_not(None))
+        exprs.append(ChurchMember.marriage_date <= marriage_date_to)
     return exprs
 
 
@@ -327,6 +359,14 @@ async def list_church_members(
     joined_to: date | None = None,
     deceased_from: date | None = None,
     deceased_to: date | None = None,
+    baptism_date_from: date | None = None,
+    baptism_date_to: date | None = None,
+    confirmation_date_from: date | None = None,
+    confirmation_date_to: date | None = None,
+    first_communion_date_from: date | None = None,
+    first_communion_date_to: date | None = None,
+    marriage_date_from: date | None = None,
+    marriage_date_to: date | None = None,
     page: int,
     page_size: int,
 ) -> ChurchMemberListResponse:
@@ -346,6 +386,14 @@ async def list_church_members(
         joined_to=joined_to,
         deceased_from=deceased_from,
         deceased_to=deceased_to,
+        baptism_date_from=baptism_date_from,
+        baptism_date_to=baptism_date_to,
+        confirmation_date_from=confirmation_date_from,
+        confirmation_date_to=confirmation_date_to,
+        first_communion_date_from=first_communion_date_from,
+        first_communion_date_to=first_communion_date_to,
+        marriage_date_from=marriage_date_from,
+        marriage_date_to=marriage_date_to,
     )
     count_stmt = select(func.count()).select_from(ChurchMember)
     if exprs:

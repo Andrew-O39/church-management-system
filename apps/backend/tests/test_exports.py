@@ -209,6 +209,133 @@ async def test_parish_registry_csv_respects_age_group_filter(
 
 
 @pytest.mark.asyncio
+async def test_parish_registry_csv_and_print_respect_sacramental_date_filters(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "ex_admin_sac@example.com")
+    await _promote_to_admin(session_factory, "ex_admin_sac@example.com")
+    admin_tok = await _login(client, "ex_admin_sac@example.com")
+    h = {"Authorization": f"Bearer {admin_tok}"}
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Sac",
+            "last_name": "CsvBaptism",
+            "is_baptized": True,
+            "baptism_date": "2021-05-20",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Sac",
+            "last_name": "CsvOtherYear",
+            "is_baptized": True,
+            "baptism_date": "2015-01-01",
+        },
+    )
+
+    r = await client.get(
+        "/api/v1/exports/parish-registry.csv",
+        headers=h,
+        params={
+            "baptism_date_from": "2021-01-01",
+            "baptism_date_to": "2021-12-31",
+        },
+    )
+    assert r.status_code == 200
+    _, data = _parse_csv(r.content)
+    flat = "\n".join(",".join(row) for row in data)
+    assert "CsvBaptism" in flat
+    assert "CsvOtherYear" not in flat
+
+    pr = await client.get(
+        "/api/v1/exports/parish-registry/print",
+        headers=h,
+        params={
+            "baptism_date_from": "2021-01-01",
+            "baptism_date_to": "2021-12-31",
+        },
+    )
+    assert pr.status_code == 200
+    body = pr.json()
+    assert body["title"] == "Parish registry export"
+    fs = body.get("filters_summary") or ""
+    assert "baptism date from: 2021-01-01" in fs.lower()
+    assert "baptism date to: 2021-12-31" in fs.lower()
+    flatp = "\n".join(",".join(x or "" for x in row) for row in body["rows"])
+    assert "CsvBaptism" in flatp
+    assert "CsvOtherYear" not in flatp
+
+
+@pytest.mark.asyncio
+async def test_parish_registry_csv_and_print_respect_first_communion_date_filters(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "ex_admin_fc@example.com")
+    await _promote_to_admin(session_factory, "ex_admin_fc@example.com")
+    admin_tok = await _login(client, "ex_admin_fc@example.com")
+    h = {"Authorization": f"Bearer {admin_tok}"}
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Fc",
+            "last_name": "InRange",
+            "is_communicant": True,
+            "first_communion_date": "2018-06-10",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Fc",
+            "last_name": "OutOfRange",
+            "is_communicant": True,
+            "first_communion_date": "2005-01-01",
+        },
+    )
+
+    r = await client.get(
+        "/api/v1/exports/parish-registry.csv",
+        headers=h,
+        params={
+            "first_communion_date_from": "2018-01-01",
+            "first_communion_date_to": "2018-12-31",
+        },
+    )
+    assert r.status_code == 200
+    _, data = _parse_csv(r.content)
+    flat = "\n".join(",".join(row) for row in data)
+    assert "InRange" in flat
+    assert "OutOfRange" not in flat
+
+    pr = await client.get(
+        "/api/v1/exports/parish-registry/print",
+        headers=h,
+        params={
+            "first_communion_date_from": "2018-01-01",
+            "first_communion_date_to": "2018-12-31",
+        },
+    )
+    assert pr.status_code == 200
+    body = pr.json()
+    fs = body.get("filters_summary") or ""
+    assert "first communion date from: 2018-01-01" in fs.lower()
+    assert "first communion date to: 2018-12-31" in fs.lower()
+    flatp = "\n".join(",".join(x or "" for x in row) for row in body["rows"])
+    assert "InRange" in flatp
+    assert "OutOfRange" not in flatp
+
+
+@pytest.mark.asyncio
 async def test_attendance_and_volunteer_exports_filtered_by_event(
     client: AsyncClient,
     session_factory: async_sessionmaker,

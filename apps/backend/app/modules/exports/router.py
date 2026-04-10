@@ -207,6 +207,14 @@ async def export_parish_registry_csv(
     joined_to: date | None = Query(default=None),
     deceased_from: date | None = Query(default=None),
     deceased_to: date | None = Query(default=None),
+    baptism_date_from: date | None = Query(default=None),
+    baptism_date_to: date | None = Query(default=None),
+    confirmation_date_from: date | None = Query(default=None),
+    confirmation_date_to: date | None = Query(default=None),
+    first_communion_date_from: date | None = Query(default=None),
+    first_communion_date_to: date | None = Query(default=None),
+    marriage_date_from: date | None = Query(default=None),
+    marriage_date_to: date | None = Query(default=None),
 ) -> Response:
     cols, rows = await exports_service.build_parish_registry_export(
         session,
@@ -223,6 +231,14 @@ async def export_parish_registry_csv(
         joined_to=joined_to,
         deceased_from=deceased_from,
         deceased_to=deceased_to,
+        baptism_date_from=baptism_date_from,
+        baptism_date_to=baptism_date_to,
+        confirmation_date_from=confirmation_date_from,
+        confirmation_date_to=confirmation_date_to,
+        first_communion_date_from=first_communion_date_from,
+        first_communion_date_to=first_communion_date_to,
+        marriage_date_from=marriage_date_from,
+        marriage_date_to=marriage_date_to,
     )
     fname = await exports_service.resolve_csv_filename(session, base_slug="parish-registry")
     return _csv_response(filename=fname, columns=cols, rows=rows)
@@ -245,6 +261,14 @@ async def export_parish_registry_print(
     joined_to: date | None = Query(default=None),
     deceased_from: date | None = Query(default=None),
     deceased_to: date | None = Query(default=None),
+    baptism_date_from: date | None = Query(default=None),
+    baptism_date_to: date | None = Query(default=None),
+    confirmation_date_from: date | None = Query(default=None),
+    confirmation_date_to: date | None = Query(default=None),
+    first_communion_date_from: date | None = Query(default=None),
+    first_communion_date_to: date | None = Query(default=None),
+    marriage_date_from: date | None = Query(default=None),
+    marriage_date_to: date | None = Query(default=None),
 ) -> PrintExportPayload:
     cols, rows = await exports_service.build_parish_registry_export(
         session,
@@ -261,6 +285,14 @@ async def export_parish_registry_print(
         joined_to=joined_to,
         deceased_from=deceased_from,
         deceased_to=deceased_to,
+        baptism_date_from=baptism_date_from,
+        baptism_date_to=baptism_date_to,
+        confirmation_date_from=confirmation_date_from,
+        confirmation_date_to=confirmation_date_to,
+        first_communion_date_from=first_communion_date_from,
+        first_communion_date_to=first_communion_date_to,
+        marriage_date_from=marriage_date_from,
+        marriage_date_to=marriage_date_to,
     )
     fs = _summary_parts(
         membership_status=membership_status.value if membership_status else None,
@@ -276,6 +308,16 @@ async def export_parish_registry_print(
         joined_to=joined_to.isoformat() if joined_to else None,
         deceased_from=deceased_from.isoformat() if deceased_from else None,
         deceased_to=deceased_to.isoformat() if deceased_to else None,
+        baptism_date_from=baptism_date_from.isoformat() if baptism_date_from else None,
+        baptism_date_to=baptism_date_to.isoformat() if baptism_date_to else None,
+        confirmation_date_from=confirmation_date_from.isoformat() if confirmation_date_from else None,
+        confirmation_date_to=confirmation_date_to.isoformat() if confirmation_date_to else None,
+        first_communion_date_from=first_communion_date_from.isoformat()
+        if first_communion_date_from
+        else None,
+        first_communion_date_to=first_communion_date_to.isoformat() if first_communion_date_to else None,
+        marriage_date_from=marriage_date_from.isoformat() if marriage_date_from else None,
+        marriage_date_to=marriage_date_to.isoformat() if marriage_date_to else None,
     )
     return await exports_service.build_print_export_payload(
         session,

@@ -302,6 +302,166 @@ async def test_church_member_list_filters_age_group_and_sacraments(
 
 
 @pytest.mark.asyncio
+async def test_church_member_list_sacramental_date_ranges_and_boolean_combo(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "sacdateadmin@example.com")
+    await _promote_to_admin(session_factory, "sacdateadmin@example.com")
+    tok = await _login(client, "sacdateadmin@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Bap",
+            "last_name": "In2023",
+            "is_baptized": True,
+            "baptism_date": "2023-06-15",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Bap",
+            "last_name": "NoDateButFlag",
+            "is_baptized": True,
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Conf",
+            "last_name": "Range2022",
+            "is_confirmed": True,
+            "confirmation_date": "2022-03-01",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Wed",
+            "last_name": "Married2024",
+            "is_married": True,
+            "marriage_date": "2024-01-10",
+        },
+    )
+
+    b = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "baptism_date_from": "2023-01-01",
+            "baptism_date_to": "2023-12-31",
+            "page_size": 50,
+        },
+    )
+    assert b.status_code == 200, b.text
+    bn = {it["last_name"] for it in b.json()["items"]}
+    assert "In2023" in bn
+    assert "NoDateButFlag" not in bn
+
+    c = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "confirmation_date_from": "2022-01-01",
+            "confirmation_date_to": "2022-12-31",
+            "page_size": 50,
+        },
+    )
+    assert c.status_code == 200, c.text
+    assert "Range2022" in {it["last_name"] for it in c.json()["items"]}
+
+    m = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "marriage_date_from": "2024-01-01",
+            "marriage_date_to": "2024-12-31",
+            "page_size": 50,
+        },
+    )
+    assert m.status_code == 200, m.text
+    assert "Married2024" in {it["last_name"] for it in m.json()["items"]}
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Communion",
+            "last_name": "Fc2019",
+            "is_communicant": True,
+            "first_communion_date": "2019-04-21",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Communion",
+            "last_name": "FcNoDate",
+            "is_communicant": True,
+        },
+    )
+    fc = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "first_communion_date_from": "2019-01-01",
+            "first_communion_date_to": "2019-12-31",
+            "page_size": 50,
+        },
+    )
+    assert fc.status_code == 200, fc.text
+    fcn = {it["last_name"] for it in fc.json()["items"]}
+    assert "Fc2019" in fcn
+    assert "FcNoDate" not in fcn
+
+    combo = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "is_baptized": "true",
+            "baptism_date_from": "2024-01-01",
+            "baptism_date_to": "2024-12-31",
+            "page_size": 50,
+        },
+    )
+    assert combo.status_code == 200, combo.text
+    assert combo.json()["total"] == 0
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Bap",
+            "last_name": "Combo2024",
+            "is_baptized": True,
+            "baptism_date": "2024-07-01",
+        },
+    )
+    combo2 = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "is_baptized": "true",
+            "baptism_date_from": "2024-01-01",
+            "baptism_date_to": "2024-12-31",
+            "page_size": 50,
+        },
+    )
+    assert combo2.status_code == 200, combo2.text
+    names = {it["last_name"] for it in combo2.json()["items"]}
+    assert "Combo2024" in names
+    assert "In2023" not in names
+
+
+@pytest.mark.asyncio
 async def test_patch_church_member_duplicate_registration_number(
     client: AsyncClient,
     session_factory: async_sessionmaker,
