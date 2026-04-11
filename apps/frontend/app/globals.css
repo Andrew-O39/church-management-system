@@ -76,3 +76,39 @@
     padding: 0.35rem 0.5rem !important;
   }
 }
+
+/* Security & Data Protection page — Print / Save as PDF */
+@media print {
+  html[data-security-doc="1"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html[data-security-doc="1"] body {
+    background: white !important;
+  }
+
+  html[data-security-doc="1"] .shepherd-app-header {
+    display: none !important;
+  }
+
+  html[data-security-doc="1"] .app-site-footer {
+    display: none !important;
+  }
+
+  html[data-security-doc="1"] main {
+    max-width: none !important;
+    padding: 0.4in 0.5in 0.6in !important;
+  }
+
+  html[data-security-doc="1"] .no-print {
+    display: none !important;
+  }
+
+  html[data-security-doc="1"] .security-doc-print {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+}

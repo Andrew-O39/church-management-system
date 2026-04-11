@@ -130,13 +130,23 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link href="/login" className={`${btnPrimary} px-5 py-3 text-base`}>
-              Sign in
-            </Link>
-            <Link href="/register" className={`${btnSecondary} px-5 py-3 text-base`}>
-              Create account
-            </Link>
+          <div className="flex flex-col items-stretch gap-3 sm:items-end">
+            <div className="flex flex-wrap gap-3">
+              <Link href="/login" className={`${btnPrimary} px-5 py-3 text-base`}>
+                Sign in
+              </Link>
+              <Link href="/register" className={`${btnSecondary} px-5 py-3 text-base`}>
+                Create account
+              </Link>
+            </div>
+            <p className="text-center text-sm text-slate-600 sm:text-right">
+              <Link
+                href="/security"
+                className="font-medium text-indigo-800 underline-offset-2 hover:text-indigo-950 hover:underline"
+              >
+                Learn how Shepherd protects parish data
+              </Link>
+            </p>
           </div>
         </div>
       </div>
