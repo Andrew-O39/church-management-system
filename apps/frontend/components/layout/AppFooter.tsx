@@ -9,6 +9,12 @@ export default function AppFooter() {
           aria-label="Site information"
         >
           <Link
+            href="/guide"
+            className="text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2"
+          >
+            User Guide
+          </Link>
+          <Link
             href="/security"
             className="text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2"
           >

@@ -111,4 +111,38 @@
     padding: 0 !important;
     background: white !important;
   }
+
+  /* User Guide page — Print / Save as PDF */
+  html[data-user-guide-doc="1"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html[data-user-guide-doc="1"] body {
+    background: white !important;
+  }
+
+  html[data-user-guide-doc="1"] .shepherd-app-header {
+    display: none !important;
+  }
+
+  html[data-user-guide-doc="1"] .app-site-footer {
+    display: none !important;
+  }
+
+  html[data-user-guide-doc="1"] main {
+    max-width: none !important;
+    padding: 0.4in 0.5in 0.6in !important;
+  }
+
+  html[data-user-guide-doc="1"] .no-print {
+    display: none !important;
+  }
+
+  html[data-user-guide-doc="1"] .user-guide-doc-print {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    background: white !important;
+  }
 }

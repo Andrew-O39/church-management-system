@@ -113,6 +113,9 @@ export default function AppHeader() {
         </div>
 
         <nav className="flex flex-wrap items-center gap-1 sm:justify-end">
+          <NavLink href="/guide" active={pathname === "/guide"}>
+            Help
+          </NavLink>
           {!showAuthenticatedChrome ? (
             <>
               <NavLink href="/login" active={pathname === "/login"}>

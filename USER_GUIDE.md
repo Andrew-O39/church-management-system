@@ -245,6 +245,8 @@ Admins see extra tools on this page to define **volunteer roles** (labels like �
 
 Admins see a searchable list of **all** ministries and can **create** new ministries from this area.
 
+On long **Ministries** screens, **collapsible sections** may group the create form, search, and list so the page is easier to scan.
+
 ### Notifications — your inbox
 
 1. Click **Notifications** in the top bar.
@@ -282,6 +284,8 @@ If you open an admin-only URL (for example **Parish registry** or **App users**)
 2. Review **Overview** statistics (app users, upcoming events, volunteer assignments, unread in-app messages, ministries).
 3. Scroll through **Attendance by event**, **Top volunteers**, and **Notifications & delivery** (including SMS and WhatsApp attempt/failure summaries).
 
+Long dashboard areas may use **collapsible sections** — you can expand or hide blocks (for example overview vs. detail sections) to scan the page more easily without changing the underlying numbers or lists.
+
 The dashboard describes **operational** data. It is **not** a parish registry report.
 
 ### Church settings (branding for print and exports)
@@ -297,10 +301,16 @@ This information can appear at the top of **print** layouts and influence how ex
 1. Click **Parish registry** in the top bar.
 2. **Registry summary** cards show totals and breakdowns (membership status, demographics, sacramental/marital summaries — as shown on screen).
 3. **Filter & export**:
-   - Set filters (search, membership status, gender, sacramental flags, age band, dates, etc.).
-   - Click **Apply filters**.
+   - Set filters (search, membership status, gender, sacramental flags, age band, etc.).
+   - **Date of birth range** — optional **from** and **to** dates to find members whose date of birth falls in that range (both ends are optional; use validation messages if the range is invalid).
+   - **Sacramental date ranges** — optional **from** and **to** dates for **baptism**, **first communion**, **confirmation**, and **marriage** (filter by when each sacrament occurred, not by place).
+   - **Saved filters** — after you **Apply filters** at least once, you can **save** the current filter set as a **named preset** for later. Open a saved preset to reload those filters; you can **rename** or **remove** presets you no longer need.
+   - **Reset filters** — clears the filter fields to their defaults (you can then **Apply filters** again or adjust before applying).
+   - Click **Apply filters** when you are ready to search with the criteria on screen.
    - **Download CSV** — downloads a file matching the **current** applied filters.
    - **Open print view** — opens a printable page; use the browser’s **Print** dialog and choose **Save as PDF** if you need a file.
+
+   The registry page groups major blocks (for example **summary**, **filters**, **saved filters**, **results**) into **collapsible sections**. Expanding or collapsing a section only changes what you see on screen — it does not change saved data or filter logic.
 
 4. **Add** a record: click **Add member record** (or equivalent) and complete the form.
 
@@ -333,6 +343,8 @@ These are **login accounts**, not the same as registry rows.
 3. Submit to create the event.
 4. Open an event from the list.
 
+On long admin screens (list, filters, and event detail), Shepherd may show **collapsible sections** so you can focus on one block at a time — for example **create event**, **search & filter**, and the **events list**, or on an event page **edit event**, **volunteer scheduling**, **event reminders**, and **attendance**.
+
 **On the event detail page (admin)**
 
 - **Edit** event fields and save.
@@ -352,11 +364,15 @@ Members do not see the full admin sections; they see their own attendance/volunt
 1. Click **Volunteers** in the top bar.
 2. In the **volunteer roles** section, create or edit roles (name, description, ministry link as the form allows).
 
+The **Volunteers** page may use **collapsible sections** (for example **my assignments** and **volunteer roles**) on long screens.
+
 Roles are used when assigning people on event pages.
 
 ### Notifications — send messages (admin)
 
 1. Click **Notifications** in the top bar.
+
+The notifications page may use **collapsible sections** for areas such as **send notification**, **your inbox**, and other blocks so you can expand only what you need.
 
 **Event reminders (global button)**
 
@@ -382,7 +398,8 @@ Roles are used when assigning people on event pages.
 
 1. Click **Exports** in the top bar.
 2. Read the note: **PDF** is produced via the browser (**Print → Save as PDF**), not by a separate “download PDF” file from the server.
-3. For **Attendance**, **Volunteers**, or **App users**:
+3. The **Exports** page may show **Attendance**, **Volunteers**, and **App users** as **collapsible sections** — open the section you need, then use **Download CSV** or **Open print view** there.
+4. For **Attendance**, **Volunteers**, or **App users**:
    - Optionally pick event, ministry, date range, or user filters as shown.
    - Click **Download CSV** to save a spreadsheet.
    - Click **Open print view** to open a print-ready page in a new tab; then use **Print or save as PDF** in that tab.
@@ -429,7 +446,7 @@ Church details from **Church settings** can appear at the top of the printed doc
 | See my ministries | **Ministries**. |
 | Read notifications | **Notifications** → **Your inbox** → **Mark read** or **Mark all read**. |
 | Create a registry record | **Parish registry** → **Add member record** → save (leave Registration # blank to auto-number). |
-| Export filtered registry | **Parish registry** → set filters → **Apply** → **Download CSV** or **Open print view**. |
+| Export filtered registry | **Parish registry** → set filters (including date ranges or a **saved** preset) → **Apply** → **Download CSV** or **Open print view**. |
 | Create an event | **Events** → fill admin create form → open event to verify. |
 | Assign a volunteer | Open **event** (admin) → **Volunteers** section → pick user and role → assign. |
 | Record attendance | Open **event** (admin) → **Attendance** → set status per person. |

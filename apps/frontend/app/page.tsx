@@ -141,6 +141,15 @@ export default function HomePage() {
             </div>
             <p className="text-center text-sm text-slate-600 sm:text-right">
               <Link
+                href="/guide"
+                className="font-medium text-indigo-800 underline-offset-2 hover:text-indigo-950 hover:underline"
+              >
+                Read the Shepherd user guide
+              </Link>
+              <span className="mx-2 text-slate-400" aria-hidden>
+                ·
+              </span>
+              <Link
                 href="/security"
                 className="font-medium text-indigo-800 underline-offset-2 hover:text-indigo-950 hover:underline"
               >

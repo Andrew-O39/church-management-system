@@ -1,89 +1,170 @@
-# Church Management System (CMS)
+# Shepherd — Church Management System
+> Built to help parishes care for their people with clarity, order, and trust.
+## Short product description
 
-This repository is a production-minded scaffold for a multi-denomination Church Management System.
+**Shepherd** is a web application for parish administration and day-to-day church operations. 
+Shepherd brings together two essential parts of parish life:
 
-## What’s inside
+- **Official parish records** — membership, sacraments, and demographics  
+- **Day-to-day operations** — events, volunteers, attendance, and communication
 
-- `apps/backend`: FastAPI app with modular domain structure, PostgreSQL + SQLAlchemy (async), Alembic migrations, JWT auth (Step 2+).
-- `apps/frontend`: Next.js (App Router) + TypeScript + Tailwind landing page + placeholder future routes.
-- `docker-compose.yml`: runs `frontend`, `backend`, and `postgres`.
-- `alembic`: database migrations live under `apps/backend/alembic/`.
+All in one clear and structured system.
 
-## Folder structure (high level)
+Administrators manage registry data and app accounts; members and leaders use the same product for profiles, events, ministries, volunteers, and their notification inbox.
+
+## Who this is for
+
+- **Parish administrators** — manage records, events, volunteers, and communication  
+- **Church members and leaders** — view events, serve in ministries, and receive notifications  
+
+Shepherd is designed to be simple enough for daily parish use, while still supporting structured record keeping.
+
+## Key concept: app users vs parish registry
+
+Shepherd deliberately separates two ideas:
+
+| | **Parish registry** | **App users** |
+|---|---------------------|----------------|
+| **What it is** | Official church office records (membership status, sacramental fields, registration numbers, etc.). | Accounts with email and password that **sign in** to Shepherd. |
+| **Typical use** | Canonical records for the parish; CSV and print exports from the **Parish registry** area. | Identity for events, attendance, volunteers, in-app and external notifications (SMS/WhatsApp where configured). |
+| **Relationship** | Adding or editing a registry row **does not** create a login. Linking a person’s registry record to an app user is **optional** and done by administrators when needed. | Operational features primarily use app users; registry and exports for registry data are maintained as a distinct concern. |
+
+Understanding this split is essential for correct use of Shepherd and for interpreting exports (registry vs operational).
+
+## Core features (grouped)
+The system is organised around practical parish needs:
+### Parish registry
+
+- Search, filter, and paginate member records; **date-of-birth** and **sacramental date ranges** (baptism, first communion, confirmation, marriage).
+- **Saved filter presets** (save, load, rename, remove) for repeat searches.
+- CSV download and browser **print view** (Save as PDF via the print dialog).
+- Registration numbers with validation and uniqueness rules.
+
+### Events & operations
+
+- Events (types, visibility, ministry scope), volunteer assignments and roles, per-event attendance for eligible app users.
+- **Event reminders** (rules, channels, optional scheduler worker in Docker).
+- Ministries (membership and roles).
+
+### Notifications
+
+- In-app inbox; admin tools to send notifications and run due reminders (globally or in event context).
+- Optional **SMS** and **WhatsApp** delivery (provider integration and profile-based routing as implemented in the backend).
+
+### Dashboard & exports
+
+- Admin **dashboard** with operational summaries.
+- **Exports** page for operational CSV/print (attendance, volunteers, app users); registry exports remain on **Parish registry**.
+
+### UX features
+
+- Advanced filtering on registry and elsewhere as implemented per page.
+- **Saved filters** on the parish registry list.
+- **Collapsible sections** on long pages (e.g. registry, events, notifications, dashboard, exports) to reduce scrolling without changing business logic.
+
+## Documentation
+
+| Resource | Description |
+|----------|-------------|
+| [`USER_GUIDE.md`](USER_GUIDE.md) | Canonical **end-user** handbook (members and administrators). |
+| [`SECURITY.md`](SECURITY.md) | Security and data-protection overview (plain language). |
+| **In-app** | **`/guide`** — User Guide rendered in the Next.js app (content aligned with `USER_GUIDE.md`). **`/security`** — Security & Data Protection page (aligned with `SECURITY.md`). |
+
+## Project structure
+
+Repository layout (representative):
 
 ```
 church-management-system/
+  USER_GUIDE.md
+  SECURITY.md
+  README.md
+  .env.example
+  docker-compose.yml
   apps/
     backend/
       app/
+        main.py
+        api/
         core/
         db/
           models/
-        modules/
-        api/
-        main.py
+        modules/          # auth, members, church_registry, events, ministries,
+                          # volunteers, attendance, notifications, event_reminders,
+                          # exports, reports, registry_saved_filters, church_profile, users, ...
       alembic/
         versions/
+      tests/
       pyproject.toml
       requirements.txt
-      tests/
+      requirements-dev.txt
+      Dockerfile
     frontend/
-      app/
+      app/                # Next.js App Router (routes include /, /members, /events, /guide, /security, …)
+      components/
+      lib/
       package.json
-  docker-compose.yml
-  .env.example
-  README.md
 ```
 
-## Local run (Docker)
+## Local development (Docker)
 
-1. Copy env example: `cp .env.example .env`
-2. Build and start: `docker compose up --build`
-3. **Apply database migrations** (first time / after schema changes):
+1. Copy environment file: `cp .env.example .env` and adjust secrets and passwords for your machine.
+2. Build and start services:
+
+   ```bash
+   docker compose up --build
+   ```
+
+   This starts **PostgreSQL**, the **backend** API, the **frontend**, and a **reminder scheduler** worker (periodic check for due event reminders; configurable via `.env`).
+
+3. **Apply database migrations** (first run and after schema changes):
 
    ```bash
    docker compose exec backend alembic upgrade head
    ```
 
 4. Verify:
+
    - Backend health: `http://localhost:8000/healthz`
    - API docs: `http://localhost:8000/docs`
    - Frontend: `http://localhost:3000`
 
-### Auth endpoints (Step 2)
+### Useful commands when iterating
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/me` (Bearer token)
-- `GET /api/v1/auth/admin/ping` (admin only — RBAC smoke test)
+- Rebuild backend image after dependency changes: `docker compose build backend`
+- Create migrations after model edits (from a shell with the app and DB configured): `alembic revision --autogenerate -m "..."` — review the migration, then `alembic upgrade head`
 
-## Local run (without Docker)
+## Local development (without Docker)
 
-Requires **PostgreSQL** and matching `DATABASE_URL` in `apps/backend/.env` (see `apps/backend/.env.example`).
+Requires **PostgreSQL** and a `DATABASE_URL` compatible with the backend (see `apps/backend/.env.example`).
 
 **Backend**
 
 ```bash
 cd apps/backend
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-pip install -r requirements-dev.txt   # for pytest / linters
-cp .env.example .env && edit .env
+pip install -r requirements-dev.txt
+cp .env.example .env   # edit DATABASE_URL and secrets
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Frontend** (optional for this step)
+**Frontend**
 
 ```bash
 cd apps/frontend
 npm install
-cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+cp .env.example .env.local   # e.g. NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 npm run dev
 ```
 
-## Tests (backend)
+**Event reminders in development:** Without Docker, there is no separate scheduler container; use the API’s reminder job endpoint or run the CLI entrypoint defined in `pyproject.toml` if you need periodic processing locally.
+
+## Tests
+
+**Backend** (pytest):
 
 ```bash
 cd apps/backend
@@ -91,14 +172,31 @@ pip install -r requirements.txt -r requirements-dev.txt
 pytest
 ```
 
-## Architectural notes
+The frontend uses `npm run lint` for static checks; add automated UI tests as the project evolves.
 
-- **Domains** are organized under `app/modules/<domain>/` (router/schemas/services).
-- **Persistence models** live in `app/db/models/` and are registered on `Base.metadata` for Alembic.
-- **Health vs readiness**: `/healthz` is soft; `/readyz` checks DB connectivity.
-- **Single-tenant MVP** with `TENANCY_MODE` / `TENANT_ID` placeholders for later SaaS evolution.
+## Architecture notes
 
-## Next manual steps (when iterating)
+- **Backend:** [FastAPI](https://fastapi.tiangolo.com/), **SQLAlchemy 2** (async) with **asyncpg**, **Alembic** migrations, **JWT**-based auth and role checks, modular packages under `app/modules/<domain>/`.
+- **Frontend:** [Next.js 14](https://nextjs.org/) (App Router), **TypeScript**, **Tailwind CSS**, client-side API calls to the backend using configured `NEXT_PUBLIC_API_BASE_URL`.
+- **Health:** `/healthz` (liveness); `/readyz` includes database connectivity where implemented.
+- **Single-tenant** deployment with optional placeholders (`TENANCY_MODE` / `TENANT_ID`) for future multi-tenant evolution—see backend settings.
 
-- Rebuild backend image after dependency changes: `docker compose build backend`
-- Create/adjust migrations after model edits: `alembic revision --autogenerate -m "..."` then review, then `alembic upgrade head`
+## Security summary
+
+Shepherd is designed with data protection in mind.
+
+- Access is limited to authorised users through secure sign-in  
+- Sensitive areas (such as the parish registry) are protected on the **server**, not just in the interface  
+- Data is stored securely and is **not publicly accessible**  
+- The system separates operational users from official registry records to reduce risk  
+
+For a full, plain-language explanation, see [`SECURITY.md`](SECURITY.md) or visit **/security** in the app.
+
+## Possible next steps
+
+- Hardening and observability for production deployments (HTTPS, secrets management, backups).
+- Deeper reporting and analytics as parish needs grow.
+- Broader automated test coverage (API integration tests, frontend E2E).
+- Multi-tenant or multi-parish models only if product direction requires them.
+
+These items depend on product and hosting choices—not fixed commitments.
