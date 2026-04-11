@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed CORS origins.
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
+    # Optional: comma-separated hostnames for TrustedHostMiddleware in production (e.g. api.example.com,localhost)
+    TRUSTED_HOSTS: str | None = None
+
     # Base prefix for API routes (domain routers).
     API_PREFIX: str = "/api/v1"
 
@@ -51,11 +54,29 @@ class Settings(BaseSettings):
     # When false, `poetry run reminder-scheduler` exits immediately (API + manual trigger still work).
     REMINDER_SCHEDULER_ENABLED: bool = True
 
+    # ---- PostgreSQL backups (Step 18) ----
+    BACKUP_ENABLED: bool = True
+    BACKUP_DIR: str = "./backups"
+    BACKUP_RETENTION_COUNT: int = 7
+    BACKUP_FILE_PREFIX: str = "shepherd_pg"
+
+    # Max login+register attempts per IP per minute (in-memory; single process).
+    AUTH_RATE_LIMIT_PER_MINUTE: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
         case_sensitive=True,
     )
+
+    @property
+    def is_local_environment(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in {
+            "local",
+            "development",
+            "dev",
+            "test",
+        }
 
 
 @lru_cache
@@ -65,4 +86,3 @@ def get_settings() -> Settings:
 
 # Convenient singleton used across the app.
 settings = get_settings()
-

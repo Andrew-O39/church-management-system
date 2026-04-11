@@ -21,11 +21,17 @@ from app.modules.auth.schemas import (
     TokenResponse,
     UserOut,
 )
+from app.modules.auth.rate_limit_dep import enforce_auth_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(enforce_auth_rate_limit)],
+)
 async def register(
     body: RegisterRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
@@ -53,7 +59,7 @@ async def register(
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(enforce_auth_rate_limit)])
 async def login(
     body: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],

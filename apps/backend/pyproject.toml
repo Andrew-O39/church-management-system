@@ -1,4 +1,5 @@
 [tool.poetry.scripts]
+backup-db = "app.cli.backup_db:main"
 bootstrap-admin = "app.cli.bootstrap_admin:main"
 reminder-scheduler = "app.cli.reminder_scheduler:main"
 

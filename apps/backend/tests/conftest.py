@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -14,8 +16,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.db.base import Base
 from app.db.session import get_async_session
 from app.main import app
+from app.modules.auth.rate_limit_dep import reset_auth_rate_limiter_for_tests
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def _reset_auth_rate_limiter() -> None:
+    reset_auth_rate_limiter_for_tests()
+    yield
+    reset_auth_rate_limiter_for_tests()
 
 
 @pytest_asyncio.fixture
