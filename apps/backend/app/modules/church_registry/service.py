@@ -270,6 +270,8 @@ def church_member_registry_filter_exprs(
     first_communion_date_to: date | None = None,
     marriage_date_from: date | None = None,
     marriage_date_to: date | None = None,
+    date_of_birth_from: date | None = None,
+    date_of_birth_to: date | None = None,
 ) -> list:
     exprs: list = [ChurchMember.is_parish_office_record.is_(True)]
     if search and search.strip():
@@ -339,6 +341,12 @@ def church_member_registry_filter_exprs(
     if marriage_date_to is not None:
         exprs.append(ChurchMember.marriage_date.is_not(None))
         exprs.append(ChurchMember.marriage_date <= marriage_date_to)
+    if date_of_birth_from is not None:
+        exprs.append(ChurchMember.date_of_birth.is_not(None))
+        exprs.append(ChurchMember.date_of_birth >= date_of_birth_from)
+    if date_of_birth_to is not None:
+        exprs.append(ChurchMember.date_of_birth.is_not(None))
+        exprs.append(ChurchMember.date_of_birth <= date_of_birth_to)
     return exprs
 
 
@@ -367,6 +375,8 @@ async def list_church_members(
     first_communion_date_to: date | None = None,
     marriage_date_from: date | None = None,
     marriage_date_to: date | None = None,
+    date_of_birth_from: date | None = None,
+    date_of_birth_to: date | None = None,
     page: int,
     page_size: int,
 ) -> ChurchMemberListResponse:
@@ -394,6 +404,8 @@ async def list_church_members(
         first_communion_date_to=first_communion_date_to,
         marriage_date_from=marriage_date_from,
         marriage_date_to=marriage_date_to,
+        date_of_birth_from=date_of_birth_from,
+        date_of_birth_to=date_of_birth_to,
     )
     count_stmt = select(func.count()).select_from(ChurchMember)
     if exprs:

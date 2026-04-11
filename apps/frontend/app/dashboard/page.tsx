@@ -10,6 +10,7 @@ import { getAccessToken } from "lib/session";
 import { isInactiveAccountError, isUnauthorized, toErrorMessage } from "lib/errors";
 import { useAuth } from "components/providers/AuthProvider";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import type {
   AttendanceReportResponse,
   DashboardSummaryResponse,
@@ -130,8 +131,12 @@ export default function DashboardPage() {
         </ContentCard>
       ) : summary ? (
         <>
-          <section className="space-y-4">
-            <h2 className="shepherd-section-title">Overview</h2>
+          <CollapsibleSection
+            title="Overview"
+            defaultOpen
+            description="Headline counts from app users and events (not parish registry)."
+            className="mb-4"
+          >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard label="Total app users" value={summary.total_users} />
               <StatCard
@@ -146,16 +151,17 @@ export default function DashboardPage() {
               />
               <StatCard label="Unread in-app messages (all users)" value={summary.unread_notifications_total} />
             </div>
-            <p className={surfaceInfo}>
+            <p className={`${surfaceInfo} mt-4`}>
               Ministries: {summary.active_ministries} active of {summary.total_ministries} total.
             </p>
-          </section>
+          </CollapsibleSection>
 
-          <ContentCard className="space-y-4">
-            <h2 className="shepherd-section-title">Attendance by event</h2>
-            <p className="text-sm text-slate-600">
-              Events with at least one attendance row, most recent first.
-            </p>
+          <CollapsibleSection
+            title="Attendance by event"
+            defaultOpen
+            description="Events with at least one attendance row, most recent first."
+            className="mb-4 space-y-4"
+          >
             {!attendance || attendance.items.length === 0 ? (
               <p className="text-sm text-slate-600">No attendance recorded yet.</p>
             ) : (
@@ -187,11 +193,14 @@ export default function DashboardPage() {
                 </table>
               </div>
             )}
-          </ContentCard>
+          </CollapsibleSection>
 
-          <ContentCard className="space-y-4">
-            <h2 className="shepherd-section-title">Top volunteers</h2>
-            <p className="text-sm text-slate-600">By total volunteer assignments (all time).</p>
+          <CollapsibleSection
+            title="Top volunteers"
+            defaultOpen
+            description="By total volunteer assignments (all time)."
+            className="mb-4 space-y-4"
+          >
             {!volunteers || volunteers.items.length === 0 ? (
               <p className="text-sm text-slate-600">No volunteer assignments yet.</p>
             ) : (
@@ -207,10 +216,13 @@ export default function DashboardPage() {
                 ))}
               </ul>
             )}
-          </ContentCard>
+          </CollapsibleSection>
 
-          <ContentCard className="space-y-4">
-            <h2 className="shepherd-section-title">Notifications & delivery</h2>
+          <CollapsibleSection
+            title="Notifications & delivery"
+            defaultOpen
+            className="space-y-4"
+          >
             {notifications ? (
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 bg-stone-50/60 px-4 py-3">
@@ -257,7 +269,7 @@ export default function DashboardPage() {
                 </div>
               </dl>
             ) : null}
-          </ContentCard>
+          </CollapsibleSection>
         </>
       ) : null}
     </PageShell>

@@ -82,6 +82,8 @@ async def list_church_members(
     first_communion_date_to: date | None = Query(default=None),
     marriage_date_from: date | None = Query(default=None),
     marriage_date_to: date | None = Query(default=None),
+    date_of_birth_from: date | None = Query(default=None),
+    date_of_birth_to: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=_MAX_PAGE_SIZE),
 ) -> ChurchMemberListResponse:
@@ -109,6 +111,8 @@ async def list_church_members(
         first_communion_date_to=first_communion_date_to,
         marriage_date_from=marriage_date_from,
         marriage_date_to=marriage_date_to,
+        date_of_birth_from=date_of_birth_from,
+        date_of_birth_to=date_of_birth_to,
         page=page,
         page_size=page_size,
     )

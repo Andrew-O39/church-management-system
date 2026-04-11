@@ -462,6 +462,56 @@ async def test_church_member_list_sacramental_date_ranges_and_boolean_combo(
 
 
 @pytest.mark.asyncio
+async def test_church_member_list_date_of_birth_range(
+    client: AsyncClient,
+    session_factory: async_sessionmaker,
+) -> None:
+    await _register(client, "dobrangeadmin@example.com")
+    await _promote_to_admin(session_factory, "dobrangeadmin@example.com")
+    tok = await _login(client, "dobrangeadmin@example.com")
+    h = {"Authorization": f"Bearer {tok}"}
+
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Dob",
+            "last_name": "InRange2010",
+            "date_of_birth": "2010-06-15",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={
+            "first_name": "Dob",
+            "last_name": "OtherYear",
+            "date_of_birth": "1985-03-20",
+        },
+    )
+    await client.post(
+        "/api/v1/church-members/",
+        headers=h,
+        json={"first_name": "Dob", "last_name": "NoDobRow"},
+    )
+
+    r = await client.get(
+        "/api/v1/church-members/",
+        headers=h,
+        params={
+            "date_of_birth_from": "2010-01-01",
+            "date_of_birth_to": "2010-12-31",
+            "page_size": 50,
+        },
+    )
+    assert r.status_code == 200, r.text
+    names = {it["last_name"] for it in r.json()["items"]}
+    assert "InRange2010" in names
+    assert "OtherYear" not in names
+    assert "NoDobRow" not in names
+
+
+@pytest.mark.asyncio
 async def test_patch_church_member_duplicate_registration_number(
     client: AsyncClient,
     session_factory: async_sessionmaker,

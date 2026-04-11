@@ -257,6 +257,7 @@ async def build_app_users_export(
 async def build_parish_registry_export(
     session: AsyncSession,
     *,
+    search: str | None = None,
     membership_status: ChurchMembershipStatus | None,
     is_deceased: bool | None,
     gender: Gender | None,
@@ -278,9 +279,11 @@ async def build_parish_registry_export(
     first_communion_date_to: date | None = None,
     marriage_date_from: date | None = None,
     marriage_date_to: date | None = None,
+    date_of_birth_from: date | None = None,
+    date_of_birth_to: date | None = None,
 ) -> tuple[list[str], list[list[Any]]]:
     exprs = church_member_registry_filter_exprs(
-        search=None,
+        search=search,
         membership_status=membership_status,
         is_active=is_active,
         is_deceased=is_deceased,
@@ -303,6 +306,8 @@ async def build_parish_registry_export(
         first_communion_date_to=first_communion_date_to,
         marriage_date_from=marriage_date_from,
         marriage_date_to=marriage_date_to,
+        date_of_birth_from=date_of_birth_from,
+        date_of_birth_to=date_of_birth_to,
     )
     stmt = select(ChurchMember).where(and_(*exprs)).order_by(ChurchMember.full_name.asc())
     members = (await session.scalars(stmt)).all()

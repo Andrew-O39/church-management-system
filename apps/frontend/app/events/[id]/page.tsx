@@ -39,6 +39,7 @@ import type {
   VolunteerRoleListResponse,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import {
   btnDangerSm,
   btnPrimary,
@@ -629,11 +630,11 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
 
         {isAdmin ? (
           <>
-          <ContentCard className="space-y-5">
-            <div className="border-b border-slate-100 pb-4">
-              <h2 className="shepherd-section-title">Edit event</h2>
-              <p className="mt-2 text-sm text-slate-600">Update when, where, and how this event appears.</p>
-            </div>
+          <CollapsibleSection
+            title="Edit event"
+            defaultOpen
+            description="Update when, where, and how this event appears."
+          >
             <form onSubmit={onSave} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
@@ -714,13 +715,13 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                 </button>
               </div>
             </form>
-          </ContentCard>
+          </CollapsibleSection>
 
-          <ContentCard className="space-y-5">
-            <div className="border-b border-slate-100 pb-4">
-              <h2 className="shepherd-section-title">Volunteer scheduling</h2>
-              <p className="mt-2 text-sm text-slate-600">Assign roles and track who is serving at this event.</p>
-            </div>
+          <CollapsibleSection
+            title="Volunteer scheduling"
+            defaultOpen
+            description="Assign roles and track who is serving at this event."
+          >
             {volunteerSectionError ? <div className={surfaceError}>{volunteerSectionError}</div> : null}
             {!detail.is_active ? (
               <p className="text-sm text-amber-800">Event is inactive. You cannot add new volunteer assignments.</p>
@@ -886,19 +887,21 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                 </table>
               </div>
             )}
-          </ContentCard>
+          </CollapsibleSection>
 
-          <ContentCard className="space-y-5">
-            <div className="border-b border-slate-100 pb-4">
-              <h2 className="shepherd-section-title">Event reminders</h2>
-              <div className="mt-2 space-y-2 text-sm text-slate-600">
+          <CollapsibleSection
+            title="Event reminders"
+            defaultOpen={false}
+            description={
+              <div className="space-y-2 text-sm text-slate-600">
                 <p>Set up automatic messages to be sent before this event starts.</p>
                 <p>Choose when to send them and how they should be delivered.</p>
                 <p>
                   Use &quot;Run due reminders now&quot; to send any reminders that are currently due.
                 </p>
               </div>
-            </div>
+            }
+          >
             {reminderSectionError ? <div className={surfaceError}>{reminderSectionError}</div> : null}
 
             <form
@@ -1031,13 +1034,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                 ) : null}
               </div>
             ) : null}
-          </ContentCard>
+          </CollapsibleSection>
 
-          <ContentCard className="space-y-5 border-t-2 border-indigo-100 pt-1">
-            <div className="border-b border-slate-100 pb-4">
-              <h2 className="shepherd-section-title">Attendance</h2>
-              <p className="mt-2 text-sm text-slate-600">Record who was present after or during the event.</p>
-            </div>
+          <CollapsibleSection
+            title="Attendance"
+            defaultOpen
+            description="Record who was present after or during the event."
+            className="border-t-2 border-indigo-100"
+          >
             {!detail.is_active ? (
               <p className="text-sm text-amber-800">
                 Event is inactive. Attendance recording is disabled.
@@ -1099,10 +1103,10 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                 </table>
               </div>
             )}
-          </ContentCard>
+          </CollapsibleSection>
           </>
         ) : (
-          <ContentCard className="space-y-4">
+          <CollapsibleSection title="Event details" defaultOpen>
             <p className="text-base text-slate-800">
               {formatDateTime(detail.start_at)} → {formatDateTime(detail.end_at)}
             </p>
@@ -1137,7 +1141,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             ) : (
               <p className="text-sm text-slate-600">You have no volunteer assignment for this event.</p>
             )}
-          </ContentCard>
+          </CollapsibleSection>
         )}
       </div>
     </PageShell>

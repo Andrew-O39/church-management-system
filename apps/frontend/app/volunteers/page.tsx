@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { useAuth } from "components/providers/AuthProvider";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import { btnPrimarySm, btnSecondary, fieldInput, surfaceError } from "lib/ui";
 import { apiFetch } from "lib/api";
 import { clearSessionAndRedirect } from "lib/auth";
@@ -222,8 +223,11 @@ export default function VolunteersPage() {
       <div className="space-y-4">
         {error ? <div className={surfaceError}>{error}</div> : null}
 
-        <ContentCard className="space-y-3">
-          <h2 className="shepherd-section-title">My assignments</h2>
+        <CollapsibleSection
+          title="My assignments"
+          defaultOpen
+          description="Upcoming and past roles you have been assigned on visible events."
+        >
           {myAssignments.length === 0 ? (
             <p className="text-sm text-slate-600">You have no volunteer assignments on upcoming or past visible events.</p>
           ) : (
@@ -250,16 +254,15 @@ export default function VolunteersPage() {
               ))}
             </ul>
           )}
-        </ContentCard>
+        </CollapsibleSection>
 
         {isAdmin ? (
-          <ContentCard className="space-y-4">
-            <h2 className="shepherd-section-title">Volunteer roles (admin)</h2>
-            <p className="text-xs text-slate-600">
-              Church-wide roles apply to any event. Ministry-scoped roles can only be used on events for that same
-              ministry.
-            </p>
-
+          <CollapsibleSection
+            title="Volunteer roles (admin)"
+            defaultOpen
+            description="Church-wide roles apply to any event. Ministry-scoped roles can only be used on events for that same ministry."
+          >
+            <div className="space-y-4">
             <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -447,7 +450,8 @@ export default function VolunteersPage() {
                 </button>
               </div>
             ) : null}
-          </ContentCard>
+            </div>
+          </CollapsibleSection>
         ) : null}
       </div>
     </PageShell>

@@ -13,8 +13,10 @@ import type {
   ChurchMemberStatsResponse,
   ChurchMembershipStatus,
   RegistryAgeGroup,
+  RegistrySavedFilterRecord,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import { btnPrimary, btnSecondary, fieldInput, fieldLabel, surfaceError, surfaceInfo } from "lib/ui";
 
 const MEMBERSHIP_OPTIONS: { value: "" | ChurchMembershipStatus; label: string }[] = [
@@ -65,6 +67,8 @@ type FilterState = {
   confirmationDateTo: string;
   marriageDateFrom: string;
   marriageDateTo: string;
+  dobFrom: string;
+  dobTo: string;
 };
 
 const emptyFilters = (): FilterState => ({
@@ -90,6 +94,8 @@ const emptyFilters = (): FilterState => ({
   confirmationDateTo: "",
   marriageDateFrom: "",
   marriageDateTo: "",
+  dobFrom: "",
+  dobTo: "",
 });
 
 function triStateParam(v: string): boolean | undefined {
@@ -127,11 +133,14 @@ function appendRegistryListParams(p: URLSearchParams, a: FilterState) {
   if (a.confirmationDateTo) p.set("confirmation_date_to", a.confirmationDateTo);
   if (a.marriageDateFrom) p.set("marriage_date_from", a.marriageDateFrom);
   if (a.marriageDateTo) p.set("marriage_date_to", a.marriageDateTo);
+  if (a.dobFrom) p.set("date_of_birth_from", a.dobFrom);
+  if (a.dobTo) p.set("date_of_birth_to", a.dobTo);
 }
 
-/** Same query shape as GET /exports/parish-registry.csv */
+/** Same query shape as GET /exports/parish-registry.csv (includes search where supported). */
 function registryExportParams(a: FilterState): Record<string, string> {
   const o: Record<string, string> = {};
+  if (a.search.trim()) o.search = a.search.trim();
   if (a.membershipStatus) o.membership_status = a.membershipStatus;
   const ia = triStateParam(a.filterActive);
   if (ia !== undefined) o.is_active = String(ia);
@@ -159,7 +168,49 @@ function registryExportParams(a: FilterState): Record<string, string> {
   if (a.confirmationDateTo) o.confirmation_date_to = a.confirmationDateTo;
   if (a.marriageDateFrom) o.marriage_date_from = a.marriageDateFrom;
   if (a.marriageDateTo) o.marriage_date_to = a.marriageDateTo;
+  if (a.dobFrom) o.date_of_birth_from = a.dobFrom;
+  if (a.dobTo) o.date_of_birth_to = a.dobTo;
   return o;
+}
+
+/** Payload for saving — mirrors currently applied registry filters (API snake_case keys). */
+function appliedToSavedRecord(a: FilterState): Record<string, string> {
+  return registryExportParams(a);
+}
+
+function savedFiltersApiToFilterState(f: Record<string, string>): FilterState {
+  const e = emptyFilters();
+  const g = (k: string) => f[k] ?? "";
+  e.search = g("search");
+  e.membershipStatus = (g("membership_status") || "") as FilterState["membershipStatus"];
+  e.filterActive = g("is_active");
+  e.filterDeceased = g("is_deceased");
+  e.gender = g("gender");
+  e.isBaptized = g("is_baptized");
+  e.isConfirmed = g("is_confirmed");
+  e.isCommunicant = g("is_communicant");
+  e.isMarried = g("is_married");
+  e.ageGroup = (g("age_group") || "") as FilterState["ageGroup"];
+  e.joinedFrom = g("joined_from");
+  e.joinedTo = g("joined_to");
+  e.deceasedFrom = g("deceased_from");
+  e.deceasedTo = g("deceased_to");
+  e.baptismDateFrom = g("baptism_date_from");
+  e.baptismDateTo = g("baptism_date_to");
+  e.firstCommunionDateFrom = g("first_communion_date_from");
+  e.firstCommunionDateTo = g("first_communion_date_to");
+  e.confirmationDateFrom = g("confirmation_date_from");
+  e.confirmationDateTo = g("confirmation_date_to");
+  e.marriageDateFrom = g("marriage_date_from");
+  e.marriageDateTo = g("marriage_date_to");
+  e.dobFrom = g("date_of_birth_from");
+  e.dobTo = g("date_of_birth_to");
+  return e;
+}
+
+function isRegistryFilterStateActive(a: FilterState): boolean {
+  const z = emptyFilters();
+  return (Object.keys(z) as (keyof FilterState)[]).some((k) => a[k] !== z[k]);
 }
 
 function buildPrintRegistryHref(params: Record<string, string>): string {
@@ -198,6 +249,14 @@ export default function ParishRegistryListPage() {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [applied, setApplied] = useState<FilterState>(emptyFilters);
 
+  const [savedFilters, setSavedFilters] = useState<RegistrySavedFilterRecord[]>([]);
+  const [savedFiltersLoading, setSavedFiltersLoading] = useState(false);
+  const [savedFiltersError, setSavedFiltersError] = useState<string | null>(null);
+  const [savedFiltersRev, setSavedFiltersRev] = useState(0);
+  const [saveFormOpen, setSaveFormOpen] = useState(false);
+  const [saveFormName, setSaveFormName] = useState("");
+  const [saveBusy, setSaveBusy] = useState(false);
+
   const hasNextPage = page * pageSize < total;
 
   useEffect(() => {
@@ -205,6 +264,29 @@ export default function ParishRegistryListPage() {
       router.replace("/profile?notice=admin_only");
     }
   }, [status, user, isAdmin, router]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !isAdmin || !token) return;
+    let cancelled = false;
+    setSavedFiltersLoading(true);
+    setSavedFiltersError(null);
+    void apiFetch<RegistrySavedFilterRecord[]>("/api/v1/registry-saved-filters/", {
+      method: "GET",
+      token,
+    })
+      .then((rows) => {
+        if (!cancelled) setSavedFilters(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setSavedFiltersError(toErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setSavedFiltersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, isAdmin, token, savedFiltersRev]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -273,6 +355,15 @@ export default function ParishRegistryListPage() {
     setApplied({ ...filters });
   }
 
+  function resetAllFilters() {
+    const cleared = emptyFilters();
+    setFilters(cleared);
+    setApplied(cleared);
+    setPage(1);
+    setSaveFormOpen(false);
+    setSaveFormName("");
+  }
+
   async function downloadRegistryCsv() {
     setExportError(null);
     if (!token) return;
@@ -300,6 +391,81 @@ export default function ParishRegistryListPage() {
   function openRegistryPrint() {
     setExportError(null);
     window.open(buildPrintRegistryHref(registryExportParams(applied)), "_blank", "noopener,noreferrer");
+  }
+
+  function bumpSavedFiltersList() {
+    setSavedFiltersRev((n) => n + 1);
+  }
+
+  function applySavedPreset(rec: RegistrySavedFilterRecord) {
+    const next = savedFiltersApiToFilterState(rec.filters);
+    setFilters(next);
+    setApplied(next);
+    setPage(1);
+  }
+
+  async function submitSaveCurrentPreset() {
+    const name = saveFormName.trim();
+    if (!name || !token || !isRegistryFilterStateActive(applied)) return;
+    setSaveBusy(true);
+    setSavedFiltersError(null);
+    try {
+      await apiFetch<RegistrySavedFilterRecord>("/api/v1/registry-saved-filters/", {
+        method: "POST",
+        token,
+        body: { name, filters: appliedToSavedRecord(applied) },
+      });
+      setSaveFormOpen(false);
+      setSaveFormName("");
+      bumpSavedFiltersList();
+    } catch (err: unknown) {
+      if (isUnauthorized(err)) {
+        clearSessionAndRedirect(router, "session_expired");
+        return;
+      }
+      setSavedFiltersError(toErrorMessage(err));
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function deleteSavedPreset(id: string) {
+    if (!token) return;
+    if (!window.confirm("Remove this saved filter?")) return;
+    setSavedFiltersError(null);
+    try {
+      await apiFetch(`/api/v1/registry-saved-filters/${id}`, { method: "DELETE", token });
+      bumpSavedFiltersList();
+    } catch (err: unknown) {
+      if (isUnauthorized(err)) {
+        clearSessionAndRedirect(router, "session_expired");
+        return;
+      }
+      setSavedFiltersError(toErrorMessage(err));
+    }
+  }
+
+  async function renameSavedPreset(id: string, currentName: string) {
+    if (!token) return;
+    const name = window.prompt("Rename saved filter", currentName);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === currentName) return;
+    setSavedFiltersError(null);
+    try {
+      await apiFetch(`/api/v1/registry-saved-filters/${id}`, {
+        method: "PATCH",
+        token,
+        body: { name: trimmed },
+      });
+      bumpSavedFiltersList();
+    } catch (err: unknown) {
+      if (isUnauthorized(err)) {
+        clearSessionAndRedirect(router, "session_expired");
+        return;
+      }
+      setSavedFiltersError(toErrorMessage(err));
+    }
   }
 
   const inputCls = fieldInput;
@@ -353,13 +519,18 @@ export default function ParishRegistryListPage() {
       </div>
 
       {stats ? (
-        <ContentCard className="mb-4">
-          <h2 className="shepherd-section-title">Registry summary</h2>
-          <p className="mt-2 text-xs text-slate-500">
-            Age bands use UTC &ldquo;today&rdquo; and recorded date of birth. Child 0–12, young adult
-            13–17, adult 18+. Rows without DOB are excluded from those three counts (see Unknown).
-          </p>
-          <div className="mt-4 space-y-4">
+        <CollapsibleSection
+          className="mb-4"
+          title="Registry summary"
+          defaultOpen
+          description={
+            <span className="text-xs text-slate-500">
+              Age bands use UTC &ldquo;today&rdquo; and recorded date of birth. Child 0–12, young adult
+              13–17, adult 18+. Rows without DOB are excluded from those three counts (see Unknown).
+            </span>
+          }
+        >
+          <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-800">Membership status</h3>
               <p className="mt-1 text-xs text-slate-500">
@@ -400,15 +571,131 @@ export default function ParishRegistryListPage() {
               </dl>
             </div>
           </div>
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
 
-      <div className="space-y-4">
-        <ContentCard>
-          <h2 className="shepherd-section-title mb-1">Filter &amp; export</h2>
-          <p className="mb-4 text-sm text-slate-600">
-            Narrow the list, then export CSV or open a print-friendly view using the same filters.
+      <CollapsibleSection
+        className="mb-4"
+        title="Saved filters"
+        defaultOpen
+        description={
+          <>
+            Save the filter set you have <strong>applied</strong> below, then load it anytime. Exports
+            and print use the same applied filters as the list.
+          </>
+        }
+      >
+        {savedFiltersError ? <div className={`${surfaceError} mt-3`}>{savedFiltersError}</div> : null}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={btnSecondary}
+            disabled={!isRegistryFilterStateActive(applied)}
+            title={
+              isRegistryFilterStateActive(applied)
+                ? undefined
+                : "Apply at least one filter before saving a preset"
+            }
+            onClick={() => {
+              setSaveFormOpen((o) => !o);
+              setSaveFormName("");
+            }}
+          >
+            Save current filter
+          </button>
+          {savedFiltersLoading ? (
+            <span className="text-sm text-slate-500">Loading saved filters…</span>
+          ) : null}
+        </div>
+        {saveFormOpen ? (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+            <label htmlFor="save-preset-name" className={fieldLabel}>
+              Name this filter set
+            </label>
+            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <input
+                id="save-preset-name"
+                value={saveFormName}
+                onChange={(e) => setSaveFormName(e.target.value)}
+                placeholder="e.g. Young adults, Baptized 2024"
+                className={`${inputCls} sm:max-w-md`}
+                maxLength={120}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={btnPrimary}
+                  disabled={
+                    saveBusy ||
+                    !saveFormName.trim() ||
+                    !isRegistryFilterStateActive(applied)
+                  }
+                  onClick={() => void submitSaveCurrentPreset()}
+                >
+                  {saveBusy ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className={btnSecondary}
+                  disabled={saveBusy}
+                  onClick={() => {
+                    setSaveFormOpen(false);
+                    setSaveFormName("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {!savedFiltersLoading && savedFilters.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-600">
+            No saved filters yet. Save frequently used registry searches here.
           </p>
+        ) : null}
+        {savedFilters.length > 0 ? (
+          <ul className="mt-4 flex flex-wrap gap-2" aria-label="Saved registry filters">
+            {savedFilters.map((sf) => (
+              <li
+                key={sf.id}
+                className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-1 shadow-sm"
+              >
+                <button
+                  type="button"
+                  className="min-w-0 truncate text-left text-sm font-medium text-slate-900 hover:text-indigo-900"
+                  onClick={() => applySavedPreset(sf)}
+                >
+                  {sf.name}
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  onClick={() => void renameSavedPreset(sf.id, sf.name)}
+                  aria-label={`Rename ${sf.name}`}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+                  onClick={() => void deleteSavedPreset(sf.id)}
+                  aria-label={`Delete ${sf.name}`}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </CollapsibleSection>
+
+      <div className="space-y-4">
+        <CollapsibleSection
+          title="Filter &amp; export"
+          defaultOpen
+          description="Narrow the list, then export CSV or open a print-friendly view using the same filters."
+        >
           {exportError ? <div className={`${surfaceError} mb-4`}>{exportError}</div> : null}
           <div className="mb-4 flex flex-wrap gap-3">
             <button type="button" className={btnPrimary} onClick={() => void downloadRegistryCsv()}>
@@ -511,6 +798,24 @@ export default function ParishRegistryListPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className={fieldLabel}>Date of birth from</label>
+                <input
+                  type="date"
+                  value={filters.dobFrom}
+                  onChange={(e) => setFilters((f) => ({ ...f, dobFrom: e.target.value }))}
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className={fieldLabel}>Date of birth to</label>
+                <input
+                  type="date"
+                  value={filters.dobTo}
+                  onChange={(e) => setFilters((f) => ({ ...f, dobTo: e.target.value }))}
+                  className={inputCls}
+                />
               </div>
               <div className="space-y-1.5">
                 <label className={fieldLabel}>Baptized</label>
@@ -726,25 +1031,33 @@ export default function ParishRegistryListPage() {
                 />
               </div>
             </div>
-            <button type="submit" className={btnPrimary}>
-              Apply filters
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button type="submit" className={btnPrimary}>
+                Apply filters
+              </button>
+              <button type="button" className={btnSecondary} onClick={resetAllFilters}>
+                Reset filters
+              </button>
+            </div>
           </form>
-        </ContentCard>
+        </CollapsibleSection>
 
         {error ? <div className={surfaceError}>{error}</div> : null}
 
-        {loading ? (
-          <ContentCard>
+        <CollapsibleSection
+          title="Registry records"
+          defaultOpen
+          description="Results for the filters you have applied (pagination is not saved in presets)."
+        >
+          {loading ? (
             <div className="flex items-center gap-3 text-sm text-slate-600">
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
               Loading registry…
             </div>
-          </ContentCard>
-        ) : null}
+          ) : null}
 
-        {!loading ? (
-          <ContentCard className="overflow-hidden p-0">
+          {!loading ? (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
               <p className="text-sm text-slate-600">
                 <span className="font-semibold text-slate-900">{total}</span> record
@@ -826,8 +1139,9 @@ export default function ParishRegistryListPage() {
                 </button>
               </div>
             </div>
-          </ContentCard>
-        ) : null}
+            </div>
+          ) : null}
+        </CollapsibleSection>
       </div>
     </PageShell>
   );

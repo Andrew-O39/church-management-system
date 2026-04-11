@@ -194,6 +194,7 @@ async def export_users_print(
 async def export_parish_registry_csv(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _: _admin,
+    search: str | None = Query(default=None, max_length=200),
     membership_status: ChurchMembershipStatus | None = Query(default=None),
     is_active: bool | None = None,
     is_deceased: bool | None = None,
@@ -215,9 +216,12 @@ async def export_parish_registry_csv(
     first_communion_date_to: date | None = Query(default=None),
     marriage_date_from: date | None = Query(default=None),
     marriage_date_to: date | None = Query(default=None),
+    date_of_birth_from: date | None = Query(default=None),
+    date_of_birth_to: date | None = Query(default=None),
 ) -> Response:
     cols, rows = await exports_service.build_parish_registry_export(
         session,
+        search=search,
         membership_status=membership_status,
         is_deceased=is_deceased,
         gender=gender,
@@ -239,6 +243,8 @@ async def export_parish_registry_csv(
         first_communion_date_to=first_communion_date_to,
         marriage_date_from=marriage_date_from,
         marriage_date_to=marriage_date_to,
+        date_of_birth_from=date_of_birth_from,
+        date_of_birth_to=date_of_birth_to,
     )
     fname = await exports_service.resolve_csv_filename(session, base_slug="parish-registry")
     return _csv_response(filename=fname, columns=cols, rows=rows)
@@ -248,6 +254,7 @@ async def export_parish_registry_csv(
 async def export_parish_registry_print(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     _: _admin,
+    search: str | None = Query(default=None, max_length=200),
     membership_status: ChurchMembershipStatus | None = Query(default=None),
     is_active: bool | None = None,
     is_deceased: bool | None = None,
@@ -269,9 +276,12 @@ async def export_parish_registry_print(
     first_communion_date_to: date | None = Query(default=None),
     marriage_date_from: date | None = Query(default=None),
     marriage_date_to: date | None = Query(default=None),
+    date_of_birth_from: date | None = Query(default=None),
+    date_of_birth_to: date | None = Query(default=None),
 ) -> PrintExportPayload:
     cols, rows = await exports_service.build_parish_registry_export(
         session,
+        search=search,
         membership_status=membership_status,
         is_deceased=is_deceased,
         gender=gender,
@@ -293,8 +303,11 @@ async def export_parish_registry_print(
         first_communion_date_to=first_communion_date_to,
         marriage_date_from=marriage_date_from,
         marriage_date_to=marriage_date_to,
+        date_of_birth_from=date_of_birth_from,
+        date_of_birth_to=date_of_birth_to,
     )
     fs = _summary_parts(
+        search=search,
         membership_status=membership_status.value if membership_status else None,
         is_active=is_active,
         is_deceased=is_deceased,
@@ -318,6 +331,8 @@ async def export_parish_registry_print(
         first_communion_date_to=first_communion_date_to.isoformat() if first_communion_date_to else None,
         marriage_date_from=marriage_date_from.isoformat() if marriage_date_from else None,
         marriage_date_to=marriage_date_to.isoformat() if marriage_date_to else None,
+        date_of_birth_from=date_of_birth_from.isoformat() if date_of_birth_from else None,
+        date_of_birth_to=date_of_birth_to.isoformat() if date_of_birth_to else None,
     )
     return await exports_service.build_print_export_payload(
         session,

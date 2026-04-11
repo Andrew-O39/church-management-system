@@ -15,6 +15,7 @@ import type {
   MinistryRoleInMinistry,
 } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import { btnPrimary, btnSecondary, fieldInput, surfaceError } from "lib/ui";
 
 const inputCls = fieldInput;
@@ -244,17 +245,16 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
       {error ? <div className={"mb-4 " + surfaceError}>{error}</div> : null}
 
       {!isAdmin && myMembership ? (
-        <ContentCard className="mb-4">
+        <CollapsibleSection title="Your membership" defaultOpen className="mb-4">
           <p className="text-sm text-slate-700">
             You are a <span className="font-medium capitalize">{formatRole(myMembership.role_in_ministry)}</span> in
             this ministry{!detail.is_active ? " (this ministry is currently inactive)." : "."}
           </p>
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
 
       {isAdmin ? (
-        <ContentCard className="mb-4 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900">Edit ministry</h2>
+        <CollapsibleSection title="Edit ministry" defaultOpen description="Update the ministry name, description, and active status." className="mb-4">
           <form onSubmit={onSaveMinistry} className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
@@ -293,12 +293,16 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
               until the ministry is active again.
             </p>
           ) : null}
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
 
       {isAdmin ? (
-        <ContentCard className="mb-4 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900">Add member</h2>
+        <CollapsibleSection
+          title="Add member"
+          defaultOpen
+          description="Invite by email or look up parish directory records to add app users."
+          className="mb-4"
+        >
           <form onSubmit={onAddMember} className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1 space-y-1.5">
               <label className="text-sm font-medium text-slate-800">Email</label>
@@ -370,17 +374,25 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
               </ul>
             ) : null}
           </div>
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
 
-      <ContentCard className="overflow-hidden p-0">
+      <CollapsibleSection
+        title={isAdmin ? "Members" : "Your membership"}
+        defaultOpen
+        description={
+          !isAdmin ? (
+            <span className="text-slate-600">Other members are not shown on this page.</span>
+          ) : undefined
+        }
+      >
+        <div className="-mx-6 -mb-6 -mt-1 overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">
-            {isAdmin ? "Members" : "Your membership"}
-          </h2>
-          {!isAdmin ? (
+          {isAdmin ? (
+            <p className="text-sm text-slate-600">Everyone with access to this ministry.</p>
+          ) : (
             <p className="text-xs text-slate-500">Other members are not shown on this page.</p>
-          ) : null}
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -456,7 +468,8 @@ export default function MinistryDetailPage({ params }: { params: { id: string } 
             </tbody>
           </table>
         </div>
-      </ContentCard>
+        </div>
+      </CollapsibleSection>
     </PageShell>
   );
 }

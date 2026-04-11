@@ -10,6 +10,7 @@ import { clearSessionAndRedirect } from "lib/auth";
 import { toErrorMessage, isUnauthorized, isInactiveAccountError } from "lib/errors";
 import type { MinistryListResponse, MyMinistriesResponse } from "lib/types";
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import { btnPrimary, fieldInput, fieldLabel, surfaceError } from "lib/ui";
 
 const inputCls = fieldInput;
@@ -149,9 +150,12 @@ export default function MinistriesPage() {
         {error ? <div className={surfaceError}>{error}</div> : null}
 
         {isAdmin ? (
-          <ContentCard>
-            <h2 className="shepherd-section-title">New ministry</h2>
-            <form onSubmit={onCreate} className="mt-3 space-y-3">
+          <CollapsibleSection
+            title="New ministry"
+            defaultOpen
+            description="Create a group; assign members from the directory on the ministry page."
+          >
+            <form onSubmit={onCreate} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <label htmlFor="m-new-name" className={fieldLabel}>
@@ -181,11 +185,11 @@ export default function MinistriesPage() {
                 {creating ? "Creating…" : "Create ministry"}
               </button>
             </form>
-          </ContentCard>
+          </CollapsibleSection>
         ) : null}
 
         {isAdmin ? (
-          <ContentCard>
+          <CollapsibleSection title="Search & filter" defaultOpen description="Filter the ministry list below.">
             <form onSubmit={onSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1 space-y-1.5">
                 <label htmlFor="m-search" className={fieldLabel}>
@@ -211,7 +215,7 @@ export default function MinistriesPage() {
                 Search
               </button>
             </form>
-          </ContentCard>
+          </CollapsibleSection>
         ) : null}
 
         {loading ? (
@@ -222,7 +226,8 @@ export default function MinistriesPage() {
             </div>
           </ContentCard>
         ) : isAdmin ? (
-          <ContentCard className="overflow-hidden p-0">
+          <CollapsibleSection title="Ministries" defaultOpen>
+            <div className="-mx-6 -mb-6 -mt-1 overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
               <p className="text-sm text-slate-600">
                 <span className="font-semibold text-slate-900">{total}</span> ministry
@@ -281,9 +286,11 @@ export default function MinistriesPage() {
                 </button>
               </div>
             ) : null}
-          </ContentCard>
+            </div>
+          </CollapsibleSection>
         ) : (
-          <ContentCard className="overflow-hidden p-0">
+          <CollapsibleSection title="Your ministries" defaultOpen>
+            <div className="-mx-6 -mb-6 -mt-1 overflow-hidden">
             <ul className="divide-y divide-slate-100 bg-white">
               {myItems.length === 0 ? (
                 <li className="px-4 py-8 text-center text-sm text-slate-600">
@@ -308,7 +315,8 @@ export default function MinistriesPage() {
                 ))
               )}
             </ul>
-          </ContentCard>
+            </div>
+          </CollapsibleSection>
         )}
       </div>
     </PageShell>

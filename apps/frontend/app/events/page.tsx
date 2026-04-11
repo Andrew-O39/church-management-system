@@ -20,6 +20,7 @@ import type {
 } from "lib/types";
 
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import { btnPrimary, fieldInput, fieldLabel, surfaceError } from "lib/ui";
 
 const inputCls = fieldInput;
@@ -192,8 +193,12 @@ export default function EventsPage() {
 
   const AdminControls = (
     <>
-      <ContentCard className="space-y-3">
-        <h2 className="shepherd-section-title">Create event</h2>
+      <CollapsibleSection
+        title="Create event"
+        defaultOpen
+        description="Add a new event to the calendar. Ministry-linked events are scoped to that ministry."
+        className="space-y-3"
+      >
         <form onSubmit={onCreate} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
@@ -288,9 +293,13 @@ export default function EventsPage() {
             {creating ? "Creating…" : "Create event"}
           </button>
         </form>
-      </ContentCard>
+      </CollapsibleSection>
 
-      <ContentCard>
+      <CollapsibleSection
+        title="Search & filter"
+        defaultOpen
+        description="Narrow the list below, then open an event for details."
+      >
         <form onSubmit={onSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1 space-y-1.5">
             <label htmlFor="ev-search" className={fieldLabel}>
@@ -332,7 +341,7 @@ export default function EventsPage() {
             Search
           </button>
         </form>
-      </ContentCard>
+      </CollapsibleSection>
     </>
   );
 
@@ -360,7 +369,7 @@ export default function EventsPage() {
         {isAdmin ? (
           <>{AdminControls}</>
         ) : (
-          <ContentCard>
+          <CollapsibleSection title="Events" defaultOpen description="Active events you can access.">
             {items.length === 0 ? (
               <p className="text-sm text-slate-600">No active events for you yet.</p>
             ) : (
@@ -385,11 +394,12 @@ export default function EventsPage() {
                 ))}
               </div>
             )}
-          </ContentCard>
+          </CollapsibleSection>
         )}
 
         {isAdmin ? (
-          <ContentCard className="overflow-hidden p-0">
+          <CollapsibleSection title="Events" defaultOpen>
+          <div className="-mx-6 -mb-6 -mt-1 overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
               <p className="text-sm text-slate-600">
                 <span className="font-semibold text-slate-900">{total}</span> event{total === 1 ? "" : "s"}
@@ -438,7 +448,8 @@ export default function EventsPage() {
                 </button>
               </div>
             </div>
-          </ContentCard>
+          </div>
+          </CollapsibleSection>
         ) : null}
       </div>
     </PageShell>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import PageShell, { ContentCard } from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import { useAuth } from "components/providers/AuthProvider";
 import { apiFetch, apiFetchBlob } from "lib/api";
 import { clearSessionAndRedirect } from "lib/auth";
@@ -318,11 +319,11 @@ export default function ExportsPage() {
       {actionError ? <div className={`${surfaceError} mb-6`}>{actionError}</div> : null}
 
       <div className="space-y-8">
-        <ContentCard>
-          <h2 className="shepherd-section-title mb-1">Attendance</h2>
-          <p className="mb-4 text-sm text-slate-600">
-            App-user attendance tied to events. Filter by event, dates, or ministry-linked events.
-          </p>
+        <CollapsibleSection
+          title="Attendance"
+          defaultOpen
+          description="App-user attendance tied to events. Filter by event, dates, or ministry-linked events."
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               {eventSelect("att-event", att.event_id, (v) => setAtt({ ...att, event_id: v }), {
@@ -373,13 +374,13 @@ export default function ExportsPage() {
               Open print view
             </button>
           </div>
-        </ContentCard>
+        </CollapsibleSection>
 
-        <ContentCard>
-          <h2 className="shepherd-section-title mb-1">Volunteers</h2>
-          <p className="mb-4 text-sm text-slate-600">
-            Volunteer assignments per event (app users only).
-          </p>
+        <CollapsibleSection
+          title="Volunteers"
+          defaultOpen={false}
+          description="Volunteer assignments per event (app users only)."
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">{eventSelect("vol-event", vol.event_id, (v) => setVol({ ...vol, event_id: v }))}</div>
             <div>
@@ -426,13 +427,13 @@ export default function ExportsPage() {
               Open print view
             </button>
           </div>
-        </ContentCard>
+        </CollapsibleSection>
 
-        <ContentCard>
-          <h2 className="shepherd-section-title mb-1">App users</h2>
-          <p className="mb-4 text-sm text-slate-600">
-            Login accounts and profiles—not parish registry records.
-          </p>
+        <CollapsibleSection
+          title="App users"
+          defaultOpen={false}
+          description="Login accounts and profiles—not parish registry records."
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={fieldLabel} htmlFor="usr-active">
@@ -485,7 +486,7 @@ export default function ExportsPage() {
               Open print view
             </button>
           </div>
-        </ContentCard>
+        </CollapsibleSection>
       </div>
     </PageShell>
   );

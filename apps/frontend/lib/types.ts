@@ -409,6 +409,25 @@ export type ChurchMemberStatsResponse = {
   members_without_accounts: number;
 };
 
+/** GET/POST/PATCH/DELETE /api/v1/registry-saved-filters — admin-owned Parish Registry presets */
+export type RegistrySavedFilterRecord = {
+  id: string;
+  name: string;
+  filters: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RegistrySavedFilterCreateBody = {
+  name: string;
+  filters: Record<string, string>;
+};
+
+export type RegistrySavedFilterPatchBody = {
+  name?: string;
+  filters?: Record<string, string>;
+};
+
 /** GET /api/v1/church-members/?age_group= — derived from date_of_birth vs UTC today */
 export type RegistryAgeGroup = "child" | "young_adult" | "adult";
 

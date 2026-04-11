@@ -26,7 +26,8 @@ import type {
   UserSearchResponse,
 } from "lib/types";
 
-import PageShell, { ContentCard } from "components/layout/PageShell";
+import PageShell from "components/layout/PageShell";
+import CollapsibleSection from "components/layout/CollapsibleSection";
 import DeliverySummaryContent from "components/notifications/DeliverySummaryContent";
 import {
   btnGhost,
@@ -369,14 +370,13 @@ export default function NotificationsPage() {
       {error ? <div className={surfaceError}>{error}</div> : null}
 
       {isAdmin ? (
-        <ContentCard className="space-y-4">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="shepherd-section-title">Event reminders</h2>
-            <p className="mt-2 text-base text-slate-600">
-            Runs any reminder messages that are currently due (based on the reminders you set up on each
-            event). Use this if you want to send them right away instead of waiting for the next automatic run.
-          </p>
-          </div>
+        <CollapsibleSection
+          title="Event reminders"
+          defaultOpen={false}
+          description="Runs any reminder messages that are currently due (based on the reminders you set up on each
+            event). Use this if you want to send them right away instead of waiting for the next automatic run."
+          className="space-y-4"
+        >
           <button
             type="button"
             onClick={() => void onRunDueReminders()}
@@ -401,18 +401,17 @@ export default function NotificationsPage() {
               ) : null}
             </div>
           ) : null}
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
 
       {isAdmin ? (
-        <ContentCard className="space-y-5">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="shepherd-section-title">Send notification</h2>
-            <p className="mt-2 text-base text-slate-600">
-            Messages go to people who use this app. SMS and WhatsApp are sent using the phone number saved on
-            each user&apos;s app profile.
-          </p>
-          </div>
+        <CollapsibleSection
+          title="Send notification"
+          defaultOpen
+          description="Messages go to people who use this app. SMS and WhatsApp are sent using the phone number saved on
+            each user&apos;s app profile."
+          className="space-y-5"
+        >
           {lastSendSummary ? (
             <div className={surfaceSuccess}>
               <p className="font-semibold text-slate-900">Delivery summary</p>
@@ -667,18 +666,16 @@ export default function NotificationsPage() {
               {sending ? "Sending…" : "Send notification"}
             </button>
           </form>
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
 
-      <ContentCard className="space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <h2 className="shepherd-section-title">Your inbox</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Refreshes about every {INBOX_REFRESH_MS / 1000} seconds so new messages appear without reloading
-              the page.
-            </p>
-          </div>
+      <CollapsibleSection
+        title="Your inbox"
+        defaultOpen
+        description={`Refreshes about every ${INBOX_REFRESH_MS / 1000} seconds so new messages appear without reloading the page.`}
+        className="space-y-5"
+      >
+        <div className="flex flex-wrap justify-end border-b border-slate-100 pb-4">
           <button type="button" onClick={() => void onMarkAllRead()} className={btnGhost}>
             Mark all read
           </button>
@@ -766,13 +763,10 @@ export default function NotificationsPage() {
             </button>
           </div>
         ) : null}
-      </ContentCard>
+      </CollapsibleSection>
 
       {isAdmin ? (
-        <ContentCard className="space-y-4">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="shepherd-section-title">Sent notifications</h2>
-          </div>
+        <CollapsibleSection title="Sent notifications" defaultOpen={false} className="space-y-4">
           {sent.length === 0 ? (
             <p className="text-base text-slate-600">No notifications sent yet.</p>
           ) : (
@@ -832,7 +826,7 @@ export default function NotificationsPage() {
               </button>
             </div>
           ) : null}
-        </ContentCard>
+        </CollapsibleSection>
       ) : null}
       </div>
     </PageShell>
