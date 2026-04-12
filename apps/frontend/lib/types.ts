@@ -46,6 +46,29 @@ export type UserSearchResponse = {
   page_size: number;
 };
 
+/** GET /api/v1/audit-logs (admin). */
+export type AuditLogItem = {
+  id: string;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  /** Stored at write time from the acting user's profile; null for older rows or pre-auth events. */
+  actor_display_name: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  summary: string;
+  metadata_json: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+};
+
+export type AuditLogListResponse = {
+  items: AuditLogItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 /** Matches backend `RegisterResponse` from POST /api/v1/auth/register (201). */
 export type RegisterResponse = JwtTokenResponse & {
   user: UserOut;

@@ -16,6 +16,7 @@ from app.db.models.event_reminder_rule import EventReminderRule
 from app.db.models.event_reminder_run import EventReminderRun
 from app.db.models.church_profile import ChurchProfile
 from app.db.models.registry_saved_filter import RegistrySavedFilter
+from app.db.models.audit_log import AuditLog
 
 __all__ = [
     "User",
@@ -34,4 +35,5 @@ __all__ = [
     "EventReminderRun",
     "ChurchProfile",
     "RegistrySavedFilter",
+    "AuditLog",
 ]

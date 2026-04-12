@@ -13,6 +13,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.db import session as db_session_module
 from app.db.base import Base
 from app.db.session import get_async_session
 from app.main import app
@@ -52,8 +53,12 @@ async def client(engine, session_factory):
         async with session_factory() as session:
             yield session
 
+    prev_factory = db_session_module.async_session_factory
+    db_session_module.async_session_factory = session_factory
+
     app.dependency_overrides[get_async_session] = override_get_session
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+    db_session_module.async_session_factory = prev_factory

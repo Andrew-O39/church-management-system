@@ -3,13 +3,16 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
+from app.modules.audit_logs.actions import VOLUNTEER_ROLES_CREATE, VOLUNTEER_ROLES_UPDATE
+from app.modules.audit_logs.request_ip import client_ip_from_request
+from app.modules.audit_logs.service import record_audit_event
 from app.modules.volunteers import service as volunteers_service
 from app.modules.volunteers.schemas import (
     MyVolunteerAssignmentsResponse,
@@ -61,10 +64,23 @@ async def list_volunteer_roles(
 )
 async def create_volunteer_role(
     body: VolunteerRoleCreate,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> VolunteerRoleDetailResponse:
-    return await volunteers_service.create_volunteer_role(session, body=body)
+    out = await volunteers_service.create_volunteer_role(session, body=body)
+    await record_audit_event(
+        action=VOLUNTEER_ROLES_CREATE,
+        summary=f"Volunteer role created: {out.name}",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="volunteer_role",
+        target_id=str(out.id),
+        metadata={"name": out.name},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.get("/roles/{role_id}", response_model=VolunteerRoleDetailResponse)
@@ -81,8 +97,21 @@ async def get_volunteer_role(
 async def patch_volunteer_role(
     role_id: uuid.UUID,
     body: VolunteerRolePatch,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> VolunteerRoleDetailResponse:
     role = await volunteers_service.get_volunteer_role_or_404(session, role_id)
-    return await volunteers_service.patch_volunteer_role(session, role=role, body=body)
+    out = await volunteers_service.patch_volunteer_role(session, role=role, body=body)
+    await record_audit_event(
+        action=VOLUNTEER_ROLES_UPDATE,
+        summary=f"Volunteer role updated: {out.name}",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="volunteer_role",
+        target_id=str(out.id),
+        metadata={"fields_changed": sorted(body.model_dump(exclude_unset=True).keys())},
+        ip_address=client_ip_from_request(request),
+    )
+    return out

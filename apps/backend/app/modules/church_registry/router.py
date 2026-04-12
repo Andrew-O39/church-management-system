@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import ChurchMembershipStatus, Gender, RegistryAgeGroup, UserRole
@@ -12,6 +12,13 @@ from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
 from app.modules.church_registry import service as registry_service
+from app.modules.audit_logs.actions import (
+    REGISTRY_MEMBER_CREATE,
+    REGISTRY_MEMBER_LINK_USER,
+    REGISTRY_MEMBER_UPDATE,
+)
+from app.modules.audit_logs.request_ip import client_ip_from_request
+from app.modules.audit_logs.service import record_audit_event
 from app.modules.church_registry.schemas import (
     ChurchMemberCreate,
     ChurchMemberDetailResponse,
@@ -50,10 +57,23 @@ async def eligible_for_event(
 @router.post("/", response_model=ChurchMemberDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_church_member(
     body: ChurchMemberCreate,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> ChurchMemberDetailResponse:
-    return await registry_service.create_church_member(session, body)
+    out = await registry_service.create_church_member(session, body)
+    await record_audit_event(
+        action=REGISTRY_MEMBER_CREATE,
+        summary=f"Parish registry record created ({out.full_name})",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="church_member",
+        target_id=str(out.id),
+        metadata={"registration_number": out.registration_number},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.get("/", response_model=ChurchMemberListResponse)
@@ -141,20 +161,47 @@ async def get_church_member(
 async def patch_church_member(
     member_id: uuid.UUID,
     body: ChurchMemberPatch,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> ChurchMemberDetailResponse:
     cm = await registry_service.get_church_member_or_404(session, member_id)
-    return await registry_service.patch_church_member(session, cm=cm, body=body)
+    out = await registry_service.patch_church_member(session, cm=cm, body=body)
+    fields = sorted(body.model_dump(exclude_unset=True).keys())
+    await record_audit_event(
+        action=REGISTRY_MEMBER_UPDATE,
+        summary=f"Parish registry record updated ({out.full_name})",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="church_member",
+        target_id=str(out.id),
+        metadata={"fields_changed": fields},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.patch("/{member_id}/link-user", response_model=ChurchMemberDetailResponse)
 async def link_church_member_user(
     member_id: uuid.UUID,
     body: LinkUserBody,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> ChurchMemberDetailResponse:
     """Optional admin/maintenance: attach a login to a registry row. Not part of primary product UX."""
     cm = await registry_service.get_church_member_or_404(session, member_id)
-    return await registry_service.link_user_to_member(session, cm=cm, user_id=body.user_id)
+    out = await registry_service.link_user_to_member(session, cm=cm, user_id=body.user_id)
+    await record_audit_event(
+        action=REGISTRY_MEMBER_LINK_USER,
+        summary=f"Linked app user to parish registry record ({out.full_name})",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="church_member",
+        target_id=str(out.id),
+        metadata={"linked_user_id": str(body.user_id)},
+        ip_address=client_ip_from_request(request),
+    )
+    return out

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import UserRole
@@ -11,6 +11,9 @@ from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
 from app.modules.members import service as members_service
+from app.modules.audit_logs.actions import APP_USER_ADMIN_UPDATE
+from app.modules.audit_logs.request_ip import client_ip_from_request
+from app.modules.audit_logs.service import record_audit_event
 from app.modules.members.schemas import (
     MemberAdminPatch,
     MemberDetailResponse,
@@ -137,6 +140,7 @@ async def get_member(
 async def patch_member(
     member_id: uuid.UUID,
     body: MemberAdminPatch,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> MemberDetailResponse:
@@ -152,4 +156,21 @@ async def patch_member(
     loaded = await members_service.get_user_with_profile(session, updated.id)
     if loaded is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    data = body.model_dump(exclude_unset=True)
+    meta: dict = {"fields_changed": sorted(data.keys())}
+    if data.get("role") is not None:
+        meta["new_role"] = str(data["role"])
+    if data.get("is_active") is not None:
+        meta["is_active"] = bool(data["is_active"])
+    await record_audit_event(
+        action=APP_USER_ADMIN_UPDATE,
+        summary=f"App user updated by admin ({loaded.full_name})",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="user",
+        target_id=str(loaded.id),
+        metadata=meta,
+        ip_address=client_ip_from_request(request),
+    )
     return _to_detail(loaded)

@@ -16,6 +16,7 @@ from app.modules.reports.router import router as reports_router
 from app.modules.exports.router import router as exports_router
 from app.modules.church_profile.router import router as church_profile_router
 from app.modules.registry_saved_filters.router import router as registry_saved_filters_router
+from app.modules.audit_logs.router import router as audit_logs_router
 
 api_router = APIRouter(prefix=settings.API_PREFIX)
 
@@ -35,4 +36,5 @@ api_router.include_router(reports_router)
 api_router.include_router(exports_router)
 api_router.include_router(church_profile_router)
 api_router.include_router(registry_saved_filters_router)
+api_router.include_router(audit_logs_router)
 

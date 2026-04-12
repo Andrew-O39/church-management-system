@@ -24,7 +24,7 @@ Shepherd is organised into two main areas:
    - Volunteers
    - Attendance
    - Notifications
-   - Dashboard and Exports (admin)
+   - Dashboard, Exports, and Audit log (admin)
 
    These features work with **App users (people who can log in)**.
 
@@ -129,7 +129,7 @@ Linking a registry record to a login is optional and done by administrators.
 After you sign in, the top bar shows your **name** and **role** (for example “admin”, “group leader”, or “member”).
 
 - **Admin**  
-  Full access to Shepherd’s administrative areas: **Dashboard**, **Exports**, **Church settings**, **Parish registry**, **App users**, and the full **Events** tools (editing, attendance, volunteers, event reminders).
+  Full access to Shepherd’s administrative areas: **Dashboard**, **Exports**, **Church settings**, **Audit log**, **Parish registry**, **App users**, and the full **Events** tools (editing, attendance, volunteers, event reminders).
 
 - **Group leader** and **Member**  
   These roles use the same **navigation** as each other for admin-only links: they **do not** see Dashboard, Exports, Church settings, Parish registry, or App users in the menu. They **do** see Profile, Events, Notifications, Ministries, and Volunteers.
@@ -288,6 +288,14 @@ Long dashboard areas may use **collapsible sections** — you can expand or hide
 
 The dashboard describes **operational** data. It is **not** a parish registry report.
 
+### Audit log
+
+1. Click **Audit log** in the top bar (next to other admin tools).
+2. Review **when** an action occurred, **who** performed it (when known), the **action** type, and a short **summary**.
+3. Optionally filter by **action** name or a **date/time range**, and use pagination for longer histories.
+
+The audit log helps with accountability (for example exports, registry edits, notifications, and sign-in events). It is not a full analytics or compliance platform.
+
 ### Church settings (branding for print and exports)
 
 1. Click **Church settings** in the top bar.
@@ -431,6 +439,7 @@ Church details from **Church settings** can appear at the top of the printed doc
 | Dashboard | `/dashboard` | Admin |
 | Exports | `/exports`, print helper `/exports/print` | Admin |
 | Church settings | `/settings/church` | Admin |
+| Audit log | `/audit-logs` | Admin |
 | Parish registry | `/members`, `/members/new`, `/members/[id]` | Admin |
 | App users | `/users`, `/users/[id]` | Admin |
 

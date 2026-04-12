@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import EventType, UserRole
@@ -12,6 +12,9 @@ from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
 from app.modules.events import service as events_service
+from app.modules.audit_logs.actions import EVENTS_CREATE, EVENTS_UPDATE
+from app.modules.audit_logs.request_ip import client_ip_from_request
+from app.modules.audit_logs.service import record_audit_event
 from app.modules.events.schemas import (
     EventCreate,
     EventDetailResponse,
@@ -66,10 +69,23 @@ async def list_events_admin(
 @router.post("/", response_model=EventDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_event(
     body: EventCreate,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> EventDetailResponse:
-    return await events_service.create_event_response(session, creator=admin, body=body)
+    out = await events_service.create_event_response(session, creator=admin, body=body)
+    await record_audit_event(
+        action=EVENTS_CREATE,
+        summary=f"Event created: {out.title}",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="event",
+        target_id=str(out.event_id),
+        metadata={"title": out.title},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.get("/{event_id}", response_model=EventDetailResponse)
@@ -86,11 +102,25 @@ async def get_event(
 async def patch_event(
     event_id: uuid.UUID,
     body: EventPatch,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> EventDetailResponse:
     event = await events_service.get_event_or_404(session, event_id)
-    return await events_service.patch_event_response(session, event=event, admin=_admin, body=body)
+    out = await events_service.patch_event_response(session, event=event, admin=admin, body=body)
+    fields = sorted(body.model_dump(exclude_unset=True).keys())
+    await record_audit_event(
+        action=EVENTS_UPDATE,
+        summary=f"Event updated: {out.title}",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="event",
+        target_id=str(out.event_id),
+        metadata={"fields_changed": fields},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.delete(

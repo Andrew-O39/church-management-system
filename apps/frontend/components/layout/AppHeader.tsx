@@ -184,6 +184,9 @@ export default function AppHeader() {
                   >
                     Church settings
                   </NavLink>
+                  <NavLink href="/audit-logs" active={pathname === "/audit-logs"}>
+                    Audit log
+                  </NavLink>
                   <NavLink
                     href="/members"
                     active={

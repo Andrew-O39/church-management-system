@@ -54,6 +54,7 @@ The system is organised around practical parish needs:
 ### Dashboard & exports
 
 - Admin **dashboard** with operational summaries.
+- **Audit log** (admin-only) listing important administrative and security-related actions stored in the database.
 - **Exports** page for operational CSV/print (attendance, volunteers, app users); registry exports remain on **Parish registry**.
 
 ### UX features
@@ -91,7 +92,7 @@ church-management-system/
           models/
         modules/          # auth, members, church_registry, events, ministries,
                           # volunteers, attendance, notifications, event_reminders,
-                          # exports, reports, registry_saved_filters, church_profile, users, ...
+                          # exports, reports, registry_saved_filters, church_profile, audit_logs, users, ...
       alembic/
         versions/
       tests/
@@ -133,6 +134,42 @@ church-management-system/
 
 - Rebuild backend image after dependency changes: `docker compose build backend`
 - Create migrations after model edits (from a shell with the app and DB configured): `alembic revision --autogenerate -m "..."` — review the migration, then `alembic upgrade head`
+
+### Database backups (PostgreSQL)
+
+Shepherd includes a **`pg_dump`-based backup CLI** (plain SQL, timestamped files, configurable retention).
+
+**Client / server version:** `pg_dump` and `psql` should be the **same major version** as your PostgreSQL server (or compatible—typically match majors). Mismatch (e.g. client 17 with server 16) can cause restore errors such as unrecognized server parameters in the dump. The backend Docker image installs **`postgresql-client-16`** to align with the **`postgres:16`** service in `docker-compose.yml`. If you upgrade the database image to PostgreSQL 17, bump the client package in `apps/backend/Dockerfile` accordingly. On bare-metal installs, install the matching `postgresql-client` major from your OS or [PostgreSQL’s APT/YUM repos](https://www.postgresql.org/download/).
+
+- **Configuration** (environment variables, see `apps/backend/.env.example`):
+  - `BACKUP_ENABLED` — set `false` to skip runs (default `true`).
+  - `BACKUP_DIR` — directory for dump files (Docker Compose defaults to `/backups` with a named volume `shepherd_backups`).
+  - `BACKUP_RETENTION_COUNT` — how many recent backups to keep; older files are deleted after each successful run.
+  - `BACKUP_FILE_PREFIX` — filename prefix (e.g. `shepherd_pg` → `shepherd_pg_20260410T120000Z.sql`).
+
+- **Run a backup (Docker)** — with the stack up:
+
+  ```bash
+  docker compose exec backend poetry run backup-db
+  ```
+
+  The backend image includes PostgreSQL **16** client tools (see Dockerfile). Logs include `backup ok` with path and size on success.
+
+- **Run a backup (local venv)** — install **`postgresql-client`** for the **same major** as your server (e.g. `postgresql-client-16` on Debian/Ubuntu via PGDG), then from `apps/backend`:
+
+  ```bash
+  poetry run backup-db
+  # or, with pip + PYTHONPATH:
+  python -m app.cli.backup_db
+  ```
+
+- **Restore** — backups are **logical SQL** dumps. Use `psql` against an **empty or disposable** database. See `apps/backend/scripts/restore_db.sh` and the comments inside it. **Always test restores on a copy**; restoring over production data is destructive.
+
+- **Automation** — schedule `backup-db` with **cron**, **systemd timers**, or your host’s job runner; this repo does not ship a separate backup container by default.
+
+**Production:** set `ENVIRONMENT=production` (or `staging`), a **long random `JWT_SECRET`**, explicit **`CORS_ORIGINS`** (no `*`), and optionally **`TRUSTED_HOSTS`** (comma-separated hostnames) so the API can validate the `Host` header. The backend **refuses to start** if production/staging secrets look like placeholders.
+
+**Auth endpoints** apply a **simple per-IP rate limit** on `/auth/login` and `/auth/register` (in-memory, per server process).
 
 ## Local development (without Docker)
 
@@ -194,7 +231,7 @@ For a full, plain-language explanation, see [`SECURITY.md`](SECURITY.md) or visi
 
 ## Possible next steps
 
-- Hardening and observability for production deployments (HTTPS, secrets management, backups).
+- Production hardening (HTTPS termination, secrets management, off-site backup copies, monitoring).
 - Deeper reporting and analytics as parish needs grow.
 - Broader automated test coverage (API integration tests, frontend E2E).
 - Multi-tenant or multi-parish models only if product direction requires them.

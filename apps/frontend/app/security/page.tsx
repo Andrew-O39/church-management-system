@@ -212,18 +212,35 @@ export default function SecurityPage() {
               <li>Controlled updates ensure records remain consistent</li>
             </ul>
             <p>This protects both accuracy and reliability.</p>
+            <h3 className="text-lg font-semibold text-slate-900">Administrative audit log</h3>
+            <p>
+              Shepherd also records selected administrative and security-related events in a database-backed{" "}
+              <strong>audit log</strong> (for example sign-in outcomes, registry and settings changes, exports, and
+              notifications). This supports accountability and basic traceability for administrators. It is not a full
+              security analytics platform and does not store complete exports or sensitive secrets.
+            </p>
           </section>
 
           <hr className="border-slate-200 print:border-slate-300" />
 
           <section id="section-9" className="scroll-mt-28 space-y-4">
             <h2 className="shepherd-section-title text-xl sm:text-2xl">9. Backups and data safety</h2>
-            <p>We plan and/or implement:</p>
-            <ul className="list-disc space-y-2 pl-6">
-              <li>Regular backups of data</li>
-              <li>Ability to restore data if needed</li>
-            </ul>
-            <p>This ensures that data is not lost due to technical issues.</p>
+            <p>
+              Shepherd includes <strong>PostgreSQL logical backups</strong> you can run on a schedule. Backups use the
+              standard <strong>pg_dump</strong> tool and are stored as <strong>timestamped SQL files</strong> in a
+              directory you configure. The <strong>pg_dump</strong> / <strong>psql</strong> client version should match
+              your database server major version (see the project README); mismatch can break restores.
+            </p>
+            <p>
+              After each successful run, older files are removed so only the most recent backups (according to your
+              retention setting) are kept. Restoring uses <strong>psql</strong> against a database you control;
+              restoring over live data can overwrite records—test on a copy first.
+            </p>
+            <p>
+              Backups are stored where you configure them; copy them off-site for disaster recovery if your parish
+              requires it. Sign-in rate limiting helps reduce abuse but is not a substitute for network protections in
+              production.
+            </p>
           </section>
 
           <hr className="border-slate-200 print:border-slate-300" />

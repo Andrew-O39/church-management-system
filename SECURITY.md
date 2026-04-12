@@ -145,16 +145,21 @@ The system prevents errors and inconsistencies:
 
 This protects both accuracy and reliability.
 
+### Administrative audit log
+
+Shepherd also records **selected administrative and security-related events** in a database-backed **audit log** (for example sign-in outcomes, registry and settings changes, exports, notifications, and similar actions). This supports **accountability** and basic traceability inside the parish office. The audit log is **not** a full security information (SIEM) system and does not retain complete copies of exported data or sensitive secrets.
+
 ---
 
 # 9. Backups and data safety
 
-We plan and/or implement:
+Shepherd includes **PostgreSQL logical backups** you can run on a schedule:
 
-- Regular backups of data
-- Ability to restore data if needed
+- Backups use the standard **`pg_dump`** tool and are stored as **timestamped SQL files** in a directory you configure (`BACKUP_DIR`). The **`pg_dump` / `psql` client major version** should match your PostgreSQL server (see project `README.md`); mismatch can break restores.
+- After each successful run, **older files are removed** so only the most recent `BACKUP_RETENTION_COUNT` backups are kept (by design; adjust retention to your parish policy).
+- **Restoring** uses **`psql`** (or the provided helper script in the repository) against a **target database** you control. Restoring over live data can **overwrite** records—always test on a **copy** first.
 
-This ensures that data is not lost due to technical issues.
+**Limitations:** backups live where you configure them (e.g. a Docker volume or disk path). They are **not** automatically copied off-site; for disaster recovery, copy backup files to another location or service your organisation trusts. Rate limiting on sign-in helps reduce brute-force noise but is **per server process** and is not a substitute for network-level protection in production.
 
 ---
 

@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import ChurchMembershipStatus, Gender, RegistryAgeGroup, UserRole
@@ -13,10 +13,42 @@ from app.db.session import get_async_session
 from app.modules.auth.deps import require_roles
 from app.modules.exports import service as exports_service
 from app.modules.exports.schemas import PrintExportPayload
+from app.modules.audit_logs.actions import (
+    EXPORT_APP_USERS_CSV,
+    EXPORT_APP_USERS_PRINT,
+    EXPORT_ATTENDANCE_CSV,
+    EXPORT_ATTENDANCE_PRINT,
+    EXPORT_PARISH_REGISTRY_CSV,
+    EXPORT_PARISH_REGISTRY_PRINT,
+    EXPORT_VOLUNTEERS_CSV,
+    EXPORT_VOLUNTEERS_PRINT,
+)
+from app.modules.audit_logs.request_ip import client_ip_from_request
+from app.modules.audit_logs.service import record_audit_event
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
 _admin = Annotated[User, Depends(require_roles(UserRole.ADMIN))]
+
+
+async def _audit_export(
+    *,
+    admin: User,
+    request: Request,
+    action: str,
+    summary: str,
+    metadata: dict,
+) -> None:
+    await record_audit_event(
+        action=action,
+        summary=summary,
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="export",
+        metadata=metadata,
+        ip_address=client_ip_from_request(request),
+    )
 
 
 def _csv_response(*, filename: str, columns: list[str], rows: list[list]) -> Response:
@@ -42,7 +74,8 @@ def _summary_parts(**kwargs: object | None) -> str | None:
 @router.get("/attendance.csv")
 async def export_attendance_csv(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     event_id: uuid.UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -56,13 +89,27 @@ async def export_attendance_csv(
         ministry_id=ministry_id,
     )
     fname = await exports_service.resolve_csv_filename(session, base_slug="attendance")
+    fs = _summary_parts(
+        event_id=str(event_id) if event_id else None,
+        date_from=date_from.isoformat() if date_from else None,
+        date_to=date_to.isoformat() if date_to else None,
+        ministry_id=str(ministry_id) if ministry_id else None,
+    )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_ATTENDANCE_CSV,
+        summary="Downloaded attendance CSV export",
+        metadata={"format": "csv", "export_kind": "attendance", "filters_summary": fs},
+    )
     return _csv_response(filename=fname, columns=cols, rows=rows)
 
 
 @router.get("/attendance/print", response_model=PrintExportPayload)
 async def export_attendance_print(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     event_id: uuid.UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -80,6 +127,13 @@ async def export_attendance_print(
         date_from=date_from.isoformat() if date_from else None,
         date_to=date_to.isoformat() if date_to else None,
         ministry_id=str(ministry_id) if ministry_id else None,
+    )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_ATTENDANCE_PRINT,
+        summary="Opened attendance print export",
+        metadata={"format": "print", "export_kind": "attendance", "filters_summary": fs},
     )
     return await exports_service.build_print_export_payload(
         session,
@@ -94,7 +148,8 @@ async def export_attendance_print(
 @router.get("/volunteers.csv")
 async def export_volunteers_csv(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     event_id: uuid.UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -108,13 +163,27 @@ async def export_volunteers_csv(
         ministry_id=ministry_id,
     )
     fname = await exports_service.resolve_csv_filename(session, base_slug="volunteers")
+    fs = _summary_parts(
+        event_id=str(event_id) if event_id else None,
+        date_from=date_from.isoformat() if date_from else None,
+        date_to=date_to.isoformat() if date_to else None,
+        ministry_id=str(ministry_id) if ministry_id else None,
+    )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_VOLUNTEERS_CSV,
+        summary="Downloaded volunteers CSV export",
+        metadata={"format": "csv", "export_kind": "volunteers", "filters_summary": fs},
+    )
     return _csv_response(filename=fname, columns=cols, rows=rows)
 
 
 @router.get("/volunteers/print", response_model=PrintExportPayload)
 async def export_volunteers_print(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     event_id: uuid.UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -133,6 +202,13 @@ async def export_volunteers_print(
         date_to=date_to.isoformat() if date_to else None,
         ministry_id=str(ministry_id) if ministry_id else None,
     )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_VOLUNTEERS_PRINT,
+        summary="Opened volunteers print export",
+        metadata={"format": "print", "export_kind": "volunteers", "filters_summary": fs},
+    )
     return await exports_service.build_print_export_payload(
         session,
         title="Volunteer assignments export",
@@ -146,7 +222,8 @@ async def export_volunteers_print(
 @router.get("/users.csv")
 async def export_users_csv(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     is_active: bool | None = None,
     role: UserRole | None = Query(default=None),
     ministry_id: uuid.UUID | None = None,
@@ -158,13 +235,26 @@ async def export_users_csv(
         ministry_id=ministry_id,
     )
     fname = await exports_service.resolve_csv_filename(session, base_slug="app-users")
+    fs = _summary_parts(
+        is_active=is_active,
+        role=role.value if role else None,
+        ministry_id=str(ministry_id) if ministry_id else None,
+    )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_APP_USERS_CSV,
+        summary="Downloaded app users CSV export",
+        metadata={"format": "csv", "export_kind": "app_users", "filters_summary": fs},
+    )
     return _csv_response(filename=fname, columns=cols, rows=rows)
 
 
 @router.get("/users/print", response_model=PrintExportPayload)
 async def export_users_print(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     is_active: bool | None = None,
     role: UserRole | None = Query(default=None),
     ministry_id: uuid.UUID | None = None,
@@ -180,6 +270,13 @@ async def export_users_print(
         role=role.value if role else None,
         ministry_id=str(ministry_id) if ministry_id else None,
     )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_APP_USERS_PRINT,
+        summary="Opened app users print export",
+        metadata={"format": "print", "export_kind": "app_users", "filters_summary": fs},
+    )
     return await exports_service.build_print_export_payload(
         session,
         title="App users export",
@@ -193,7 +290,8 @@ async def export_users_print(
 @router.get("/parish-registry.csv")
 async def export_parish_registry_csv(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     search: str | None = Query(default=None, max_length=200),
     membership_status: ChurchMembershipStatus | None = Query(default=None),
     is_active: bool | None = None,
@@ -247,13 +345,49 @@ async def export_parish_registry_csv(
         date_of_birth_to=date_of_birth_to,
     )
     fname = await exports_service.resolve_csv_filename(session, base_slug="parish-registry")
+    fs = _summary_parts(
+        search=search,
+        membership_status=membership_status.value if membership_status else None,
+        is_active=is_active,
+        is_deceased=is_deceased,
+        gender=gender.value if gender else None,
+        is_baptized=is_baptized,
+        is_confirmed=is_confirmed,
+        is_communicant=is_communicant,
+        is_married=is_married,
+        age_group=age_group.value if age_group else None,
+        joined_from=joined_from.isoformat() if joined_from else None,
+        joined_to=joined_to.isoformat() if joined_to else None,
+        deceased_from=deceased_from.isoformat() if deceased_from else None,
+        deceased_to=deceased_to.isoformat() if deceased_to else None,
+        baptism_date_from=baptism_date_from.isoformat() if baptism_date_from else None,
+        baptism_date_to=baptism_date_to.isoformat() if baptism_date_to else None,
+        confirmation_date_from=confirmation_date_from.isoformat() if confirmation_date_from else None,
+        confirmation_date_to=confirmation_date_to.isoformat() if confirmation_date_to else None,
+        first_communion_date_from=first_communion_date_from.isoformat()
+        if first_communion_date_from
+        else None,
+        first_communion_date_to=first_communion_date_to.isoformat() if first_communion_date_to else None,
+        marriage_date_from=marriage_date_from.isoformat() if marriage_date_from else None,
+        marriage_date_to=marriage_date_to.isoformat() if marriage_date_to else None,
+        date_of_birth_from=date_of_birth_from.isoformat() if date_of_birth_from else None,
+        date_of_birth_to=date_of_birth_to.isoformat() if date_of_birth_to else None,
+    )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_PARISH_REGISTRY_CSV,
+        summary="Downloaded parish registry CSV export",
+        metadata={"format": "csv", "export_kind": "parish_registry", "filters_summary": fs},
+    )
     return _csv_response(filename=fname, columns=cols, rows=rows)
 
 
 @router.get("/parish-registry/print", response_model=PrintExportPayload)
 async def export_parish_registry_print(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _: _admin,
+    admin: _admin,
+    request: Request,
     search: str | None = Query(default=None, max_length=200),
     membership_status: ChurchMembershipStatus | None = Query(default=None),
     is_active: bool | None = None,
@@ -333,6 +467,13 @@ async def export_parish_registry_print(
         marriage_date_to=marriage_date_to.isoformat() if marriage_date_to else None,
         date_of_birth_from=date_of_birth_from.isoformat() if date_of_birth_from else None,
         date_of_birth_to=date_of_birth_to.isoformat() if date_of_birth_to else None,
+    )
+    await _audit_export(
+        admin=admin,
+        request=request,
+        action=EXPORT_PARISH_REGISTRY_PRINT,
+        summary="Opened parish registry print export",
+        metadata={"format": "print", "export_kind": "parish_registry", "filters_summary": fs},
     )
     return await exports_service.build_print_export_payload(
         session,

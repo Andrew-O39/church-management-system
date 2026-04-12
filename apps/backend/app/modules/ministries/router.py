@@ -3,13 +3,16 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
+from app.modules.audit_logs.actions import MINISTRIES_CREATE, MINISTRIES_UPDATE
+from app.modules.audit_logs.request_ip import client_ip_from_request
+from app.modules.audit_logs.service import record_audit_event
 from app.modules.ministries import service as ministries_service
 from app.modules.ministries.schemas import (
     MinistryCreate,
@@ -64,11 +67,24 @@ async def list_ministries(
 @router.post("/", response_model=MinistryDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_ministry(
     body: MinistryCreate,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> MinistryDetailResponse:
     m = await ministries_service.create_ministry(session, body)
-    return await ministries_service.ministry_detail_for_admin(session, m)
+    out = await ministries_service.ministry_detail_for_admin(session, m)
+    await record_audit_event(
+        action=MINISTRIES_CREATE,
+        summary=f"Ministry created: {out.name}",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="ministry",
+        target_id=str(out.id),
+        metadata={"name": out.name},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.get("/{ministry_id}", response_model=MinistryDetailResponse)
@@ -87,12 +103,25 @@ async def get_ministry(
 async def patch_ministry(
     ministry_id: uuid.UUID,
     body: MinistryPatch,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    _admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
+    admin: Annotated[User, Depends(require_roles(UserRole.ADMIN))],
 ) -> MinistryDetailResponse:
     m = await ministries_service.get_ministry_or_404(session, ministry_id)
     updated = await ministries_service.patch_ministry(session, m, body)
-    return await ministries_service.ministry_detail_for_admin(session, updated)
+    out = await ministries_service.ministry_detail_for_admin(session, updated)
+    await record_audit_event(
+        action=MINISTRIES_UPDATE,
+        summary=f"Ministry updated: {out.name}",
+        actor_user_id=admin.id,
+        actor_email=admin.email,
+        actor_display_name=admin.full_name,
+        target_type="ministry",
+        target_id=str(out.id),
+        metadata={"fields_changed": sorted(body.model_dump(exclude_unset=True).keys())},
+        ip_address=client_ip_from_request(request),
+    )
+    return out
 
 
 @router.post(
