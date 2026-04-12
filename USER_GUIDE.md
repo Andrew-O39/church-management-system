@@ -132,7 +132,7 @@ After you sign in, the top bar shows your **name** and **role** (for example “
   Full access to Shepherd’s administrative areas: **Dashboard**, **Exports**, **Church settings**, **Audit log**, **Parish registry**, **App users**, and the full **Events** tools (editing, attendance, volunteers, event reminders).
 
 - **Group leader** and **Member**  
-  These roles use the same **navigation** as each other for admin-only links: they **do not** see Dashboard, Exports, Church settings, Parish registry, or App users in the menu. They **do** see Profile, Events, Notifications, Ministries, and Volunteers.
+  These roles use the same **navigation** as each other for admin-only links: they **do not** see Dashboard, Exports, Church settings, Audit log, Parish registry, or App users in the menu. They **do** see Profile, Events, Notifications, Ministries, and Volunteers.
 
 > **Note:** Shepherd’s interface treats only **admin** as a powerful role today. If you need administrative work done, your parish should use an **admin** account.
 
@@ -340,10 +340,14 @@ This information can appear at the top of **print** layouts and influence how ex
 ### App users
 
 1. Click **App users** in the top bar.
-2. Search or filter the list.
-3. Open a user to view or adjust account-oriented details (as the user detail page provides).
+2. Search or filter the list. Administrators show an **Administrator** badge in the role column so you can see who has full admin access.
+3. Open a user to manage their **login account** and app profile fields.
 
-These are **login accounts**, not the same as registry rows.
+**Multiple administrators:** A parish can (and should) have **more than one** admin account—each staff member who needs full access should use **their own** login. Shared admin passwords are **not** recommended (they weaken accountability and make audit trails harder to interpret). From a user’s detail page, an admin can **grant administrator access** (promote to admin) or **remove administrator access** (demote to group leader or member), subject to safeguards so the system is never left with **no** active administrator.
+
+**If you see an error** about the last administrator, add or promote another admin before removing access or deactivating the final active admin account.
+
+These are **login accounts**, not the same as parish registry rows.
 
 ### Events — create and manage
 

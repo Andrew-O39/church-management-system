@@ -12,6 +12,8 @@ All in one clear and structured system.
 
 Administrators manage registry data and app accounts; members and leaders use the same product for profiles, events, ministries, volunteers, and their notification inbox.
 
+A parish can have **multiple administrator accounts** (each with their own login), which strengthens auditability and accountability compared to sharing one admin password.
+
 ## Who this is for
 
 - **Parish administrators** — manage records, events, volunteers, and communication  

@@ -11,7 +11,13 @@ from app.db.models.user import User
 from app.db.session import get_async_session
 from app.modules.auth.deps import get_current_active_user, require_roles
 from app.modules.members import service as members_service
-from app.modules.audit_logs.actions import APP_USER_ADMIN_UPDATE
+from app.modules.audit_logs.actions import (
+    APP_USER_ADMIN_DEMOTED,
+    APP_USER_ADMIN_PROMOTED,
+    APP_USER_ADMIN_UPDATE,
+    APP_USER_DEACTIVATED,
+    APP_USER_REACTIVATED,
+)
 from app.modules.audit_logs.request_ip import client_ip_from_request
 from app.modules.audit_logs.service import record_audit_event
 from app.modules.members.schemas import (
@@ -26,6 +32,31 @@ from app.modules.members.schemas import (
 router = APIRouter(prefix="/members", tags=["members"])
 
 _MAX_PAGE_SIZE = 100
+
+
+def _audit_action_for_member_change(
+    *,
+    old_role: UserRole,
+    old_active: bool,
+    loaded: User,
+) -> tuple[str, str]:
+    """Return (action, summary) for app-user admin edits."""
+    if old_role != loaded.role:
+        if loaded.role == UserRole.ADMIN and old_role != UserRole.ADMIN:
+            return (
+                APP_USER_ADMIN_PROMOTED,
+                f"Granted administrator access: {loaded.full_name}",
+            )
+        if old_role == UserRole.ADMIN and loaded.role != UserRole.ADMIN:
+            return (
+                APP_USER_ADMIN_DEMOTED,
+                f"Removed administrator access: {loaded.full_name}",
+            )
+    if old_active and not loaded.is_active:
+        return APP_USER_DEACTIVATED, f"Deactivated app user: {loaded.full_name}"
+    if not old_active and loaded.is_active:
+        return APP_USER_REACTIVATED, f"Reactivated app user: {loaded.full_name}"
+    return APP_USER_ADMIN_UPDATE, f"App user updated: {loaded.full_name}"
 
 
 def _to_list_item(user: User) -> MemberListItem:
@@ -147,6 +178,8 @@ async def patch_member(
     target = await members_service.get_user_with_profile(session, member_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    old_role = target.role
+    old_active = target.is_active
     updated = await members_service.apply_admin_patch(
         session,
         target=target,
@@ -159,12 +192,19 @@ async def patch_member(
     data = body.model_dump(exclude_unset=True)
     meta: dict = {"fields_changed": sorted(data.keys())}
     if data.get("role") is not None:
-        meta["new_role"] = str(data["role"])
+        meta["previous_role"] = str(old_role)
+        meta["new_role"] = str(loaded.role)
     if data.get("is_active") is not None:
-        meta["is_active"] = bool(data["is_active"])
+        meta["previous_active"] = old_active
+        meta["is_active"] = bool(loaded.is_active)
+    audit_action, audit_summary = _audit_action_for_member_change(
+        old_role=old_role,
+        old_active=old_active,
+        loaded=loaded,
+    )
     await record_audit_event(
-        action=APP_USER_ADMIN_UPDATE,
-        summary=f"App user updated by admin ({loaded.full_name})",
+        action=audit_action,
+        summary=audit_summary,
         actor_user_id=admin.id,
         actor_email=admin.email,
         actor_display_name=admin.full_name,

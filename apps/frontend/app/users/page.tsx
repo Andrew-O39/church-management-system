@@ -16,6 +16,19 @@ function formatRole(role: string) {
   return role.split("_").join(" ");
 }
 
+function roleCell(row: { role: string }) {
+  if (row.role === "admin") {
+    return (
+      <span className="inline-flex items-center">
+        <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-900">
+          Administrator
+        </span>
+      </span>
+    );
+  }
+  return <span className="capitalize text-slate-700">{formatRole(row.role)}</span>;
+}
+
 export default function AppUsersListPage() {
   const router = useRouter();
   const token = getAccessToken();
@@ -135,7 +148,7 @@ export default function AppUsersListPage() {
                 className={fieldInput}
               >
                 <option value="">Any</option>
-                <option value="admin">Admin</option>
+                <option value="admin">Administrator</option>
                 <option value="group_leader">Group leader</option>
                 <option value="member">Member</option>
               </select>
@@ -181,7 +194,7 @@ export default function AppUsersListPage() {
                       <tr key={row.member_id}>
                         <td className="px-3 py-2 font-medium text-slate-900">{row.full_name}</td>
                         <td className="px-3 py-2 text-slate-700">{row.email}</td>
-                        <td className="px-3 py-2 text-slate-700">{formatRole(row.role)}</td>
+                        <td className="px-3 py-2">{roleCell(row)}</td>
                         <td className="px-3 py-2">
                           <span
                             className={

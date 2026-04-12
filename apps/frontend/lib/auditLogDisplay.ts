@@ -25,6 +25,10 @@ const ACTION_LABELS: Record<string, string> = {
   // Settings & users
   "church_profile.update": "Church settings updated",
   "app_user.admin_update": "App user updated",
+  "app_user.admin_promoted": "Administrator access granted",
+  "app_user.admin_demoted": "Administrator access removed",
+  "app_user.deactivated": "App user deactivated",
+  "app_user.reactivated": "App user reactivated",
   // Events & operations (Step 19 follow-up)
   "events.create": "Event created",
   "events.update": "Event updated",

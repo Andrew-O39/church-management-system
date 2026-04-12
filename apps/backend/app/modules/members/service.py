@@ -79,9 +79,19 @@ async def email_in_use_by_other(
     return q.first() is not None
 
 
-async def count_admins(session: AsyncSession) -> int:
+async def count_active_admins_excluding(
+    session: AsyncSession,
+    exclude_user_id: uuid.UUID,
+) -> int:
+    """Active administrators other than ``exclude_user_id`` (for last-admin safeguards)."""
     q = await session.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.ADMIN),
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.role == UserRole.ADMIN,
+            User.is_active.is_(True),
+            User.id != exclude_user_id,
+        ),
     )
     return int(q.scalar_one())
 
@@ -142,13 +152,32 @@ async def assert_admin_patch_role_safe(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot change your own role",
         )
-    if target.role == UserRole.ADMIN and new_role != UserRole.ADMIN:
-        admins = await count_admins(session)
-        if admins <= 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot remove the last admin",
-            )
+
+
+_LAST_ADMIN_MSG = (
+    "Cannot remove administrator access or deactivate the last active administrator. "
+    "Promote another user to administrator first, or have another active administrator make this change."
+)
+
+
+async def assert_last_active_admin_protected(
+    session: AsyncSession,
+    *,
+    target: User,
+    final_role: UserRole,
+    final_active: bool,
+) -> None:
+    """Ensure at least one active admin remains (multiple admins supported; prevents lockout)."""
+    was_active_admin = target.role == UserRole.ADMIN and target.is_active
+    will_be_active_admin = final_role == UserRole.ADMIN and final_active
+    if not was_active_admin or will_be_active_admin:
+        return
+    others = await count_active_admins_excluding(session, target.id)
+    if others < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_LAST_ADMIN_MSG,
+        )
 
 
 async def apply_admin_patch(
@@ -160,12 +189,20 @@ async def apply_admin_patch(
 ) -> User:
     data = patch.model_dump(exclude_unset=True)
     new_role = data.pop("role", None)
+    final_role = new_role if new_role is not None else target.role
+    final_active = bool(data["is_active"]) if "is_active" in data else target.is_active
 
     await assert_admin_patch_role_safe(
         session,
         acting_admin_id=acting_admin_id,
         target=target,
         new_role=new_role,
+    )
+    await assert_last_active_admin_protected(
+        session,
+        target=target,
+        final_role=final_role,
+        final_active=final_active,
     )
 
     profile = target.member_profile

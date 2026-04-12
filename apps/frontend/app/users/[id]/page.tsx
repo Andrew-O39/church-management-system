@@ -19,8 +19,15 @@ function optString(v: string) {
   return s === "" ? null : s;
 }
 
-function formatRole(role: string) {
-  return role.split("_").join(" ");
+function roleLabel(r: UserRole): string {
+  switch (r) {
+    case "admin":
+      return "Administrator access (full church settings & registry)";
+    case "group_leader":
+      return "Group leader";
+    default:
+      return "Member";
+  }
 }
 
 export default function AppUserDetailPage({ params }: { params: { id: string } }) {
@@ -203,19 +210,28 @@ export default function AppUserDetailPage({ params }: { params: { id: string } }
                   required
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className={fieldLabel}>Role</label>
+              <div className="space-y-1.5 md:col-span-2">
+                <label className={fieldLabel}>Role / access level</label>
+                <p className="mb-2 text-xs text-slate-600">
+                  Parishes can have several administrators—each person should use their own login. Use{" "}
+                  <strong>Promote</strong> (choose Administrator access) or <strong>Remove admin access</strong> (choose
+                  Member or Group leader) as needed. Shepherd blocks changes that would leave no active administrator.
+                </p>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as UserRole)}
                   className={inputCls}
+                  aria-describedby="role-help"
                 >
                   <option value="member">Member</option>
                   <option value="group_leader">Group leader</option>
-                  <option value="admin">Admin</option>
+                  <option value="admin">Administrator access — full parish tools</option>
                 </select>
+                <p id="role-help" className="mt-1.5 text-xs text-slate-500">
+                  Current: <span className="font-medium text-slate-700">{roleLabel(data.role)}</span>
+                </p>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <label className={fieldLabel}>Account status</label>
                 <label className="flex items-center gap-2 text-sm text-slate-800">
                   <input
@@ -226,6 +242,10 @@ export default function AppUserDetailPage({ params }: { params: { id: string } }
                   />
                   Active (can sign in)
                 </label>
+                <p className="mt-1 text-xs text-slate-500">
+                  Deactivating the only remaining active administrator is blocked; you will see the server message if that
+                  applies.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <label className={fieldLabel}>Phone</label>
@@ -291,7 +311,7 @@ export default function AppUserDetailPage({ params }: { params: { id: string } }
                 {submitting ? "Saving…" : "Save changes"}
               </button>
               <span className="text-xs text-slate-500">
-                App role: <span className="font-medium text-slate-700">{formatRole(data.role)}</span>
+                Saved access: <span className="font-medium text-slate-700">{roleLabel(data.role)}</span>
               </span>
             </div>
           </form>

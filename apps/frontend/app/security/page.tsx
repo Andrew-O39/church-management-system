@@ -89,6 +89,11 @@ export default function SecurityPage() {
               <li>App users</li>
               <li>Church settings</li>
             </ul>
+            <p>
+              Parishes may use <strong>several administrator accounts</strong>, each with its own email and password.
+              Separate logins improve <strong>accountability</strong>; the <strong>audit log</strong> is most meaningful
+              when staff do not share a single admin credential.
+            </p>
             <h3 className="pt-2 text-lg font-semibold text-slate-900">Regular users</h3>
             <p>Regular members and volunteers:</p>
             <ul className="list-disc space-y-2 pl-6">

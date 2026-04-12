@@ -29,6 +29,10 @@ CHURCH_PROFILE_UPDATE = "church_profile.update"
 
 # App user directory (admin PATCH /members/{id})
 APP_USER_ADMIN_UPDATE = "app_user.admin_update"
+APP_USER_ADMIN_PROMOTED = "app_user.admin_promoted"
+APP_USER_ADMIN_DEMOTED = "app_user.admin_demoted"
+APP_USER_DEACTIVATED = "app_user.deactivated"
+APP_USER_REACTIVATED = "app_user.reactivated"
 
 # Events (admin)
 EVENTS_CREATE = "events.create"

@@ -840,9 +840,18 @@ Linking a registry record to a login is optional and done by administrators.`}
             <li>
               Click <strong>App users</strong> in the top bar.
             </li>
-            <li>Search or filter the list.</li>
-            <li>Open a user to view or adjust account-oriented details (as the user detail page provides).</li>
+            <li>
+              Search or filter the list. Administrators show an <strong>Administrator</strong> badge in the role column.
+            </li>
+            <li>Open a user to manage their <strong>login account</strong> and app profile fields.</li>
           </ol>
+          <p>
+            <strong>Multiple administrators:</strong> A parish can (and should) have more than one admin account—each
+            staff member who needs full access should use <strong>their own</strong> login. Shared admin passwords are{" "}
+            <strong>not</strong> recommended. From a user&apos;s detail page, an admin can <strong>grant administrator access</strong>{" "}
+            or <strong>remove administrator access</strong>, subject to safeguards so the system is never left with no active
+            administrator. If you see an error about the last administrator, add or promote another admin first.
+          </p>
           <p>
             These are <strong>login accounts</strong>, not the same as registry rows.
           </p>

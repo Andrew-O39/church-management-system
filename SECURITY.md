@@ -29,6 +29,8 @@ Only authorised parish administrators can access:
 - App users
 - Church settings
 
+Parishes may use **several administrator accounts**, each with its own email and password. Separate logins improve **accountability**; the **audit log** is most meaningful when staff do not share a single admin credential.
+
 ### Regular users
 Regular members and volunteers:
 
