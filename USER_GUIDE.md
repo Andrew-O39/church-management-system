@@ -290,11 +290,12 @@ The dashboard describes **operational** data. It is **not** a parish registry re
 
 ### Audit log
 
-1. Click **Audit log** in the top bar (next to other admin tools).
-2. Review **when** an action occurred, **who** performed it (when known), the **action** type, and a short **summary**.
-3. Optionally filter by **action** name or a **date/time range**, and use pagination for longer histories.
+1. Click **Audit log** in the top bar (with other admin tools, for example after **Church settings**).
+2. The table shows **when** something happened, **who** did it (name and email when stored—otherwise email or another identifier), a short plain-language **what** label, **context** where helpful, and **details** (a readable summary of the action).
+3. Use **Apply** to filter by **action code** (the same short codes the app stores—shown in the filter hint) and optional **date/time** range. Use pagination when the list is long.
+4. Expand a row (**▼**) to open **technical details** (for example internal IDs and metadata) if you need them; day-to-day review usually stays in the main table.
 
-The audit log helps with accountability (for example exports, registry edits, notifications, and sign-in events). It is not a full analytics or compliance platform.
+The audit log supports accountability and traceability across many admin workflows. It is not a full analytics or compliance platform. Very old rows may not include a stored display name for **who**.
 
 ### Church settings (branding for print and exports)
 

@@ -54,7 +54,7 @@ The system is organised around practical parish needs:
 ### Dashboard & exports
 
 - Admin **dashboard** with operational summaries.
-- **Audit log** (admin-only) listing important administrative and security-related actions stored in the database.
+- **Audit log** (admin-only): a searchable history of important administrative and security-related actions (for example sign-ins, exports, registry and settings changes, notifications, events, attendance, and volunteer actions). It is stored in the database and supports **accountability** and basic **traceability** in the parish office—not a full analytics or compliance system.
 - **Exports** page for operational CSV/print (attendance, volunteers, app users); registry exports remain on **Parish registry**.
 
 ### UX features

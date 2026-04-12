@@ -147,7 +147,9 @@ This protects both accuracy and reliability.
 
 ### Administrative audit log
 
-Shepherd also records **selected administrative and security-related events** in a database-backed **audit log** (for example sign-in outcomes, registry and settings changes, exports, notifications, and similar actions). This supports **accountability** and basic traceability inside the parish office. The audit log is **not** a full security information (SIEM) system and does not retain complete copies of exported data or sensitive secrets.
+Shepherd also records **selected administrative and security-related events** in a database-backed **audit log** (for example sign-in outcomes, registry and settings changes, exports, notifications, events, attendance, volunteer assignments, and similar actions). This supports **accountability**, basic **traceability**, and can help administrators notice **unusual or unexpected activity** when reviewing entries over time.
+
+**Passwords**, **session tokens**, and other authentication secrets are **not** stored in the audit log. The log does **not** keep full copies of exported datasets. The audit log is **not** a full security information (SIEM) system.
 
 ---
 

@@ -55,7 +55,7 @@ export default function UserGuideArticle() {
               <li>Volunteers</li>
               <li>Attendance</li>
               <li>Notifications</li>
-              <li>Dashboard and Exports (admin)</li>
+              <li>Dashboard, Exports, and Audit log (admin)</li>
             </ul>
             <p className="mt-2">These features work with <strong>App users (people who can log in)</strong>.</p>
           </li>
@@ -207,14 +207,16 @@ Linking a registry record to a login is optional and done by administrators.`}
             <strong>Admin</strong>
             <br />
             Full access to Shepherd&apos;s administrative areas: <strong>Dashboard</strong>, <strong>Exports</strong>,{" "}
-            <strong>Church settings</strong>, <strong>Parish registry</strong>, <strong>App users</strong>, and the
-            full <strong>Events</strong> tools (editing, attendance, volunteers, event reminders).
+            <strong>Church settings</strong>, <strong>Audit log</strong>, <strong>Parish registry</strong>,{" "}
+            <strong>App users</strong>, and the full <strong>Events</strong> tools (editing, attendance, volunteers, event
+            reminders).
           </li>
           <li>
             <strong>Group leader</strong> and <strong>Member</strong>
             <br />
             These roles use the same <strong>navigation</strong> as each other for admin-only links: they{" "}
-            <strong>do not</strong> see Dashboard, Exports, Church settings, Parish registry, or App users in the menu.
+            <strong>do not</strong> see Dashboard, Exports, Church settings, Audit log, Parish registry, or App users in
+            the menu.
             They <strong>do</strong> see Profile, Events, Notifications, Ministries, and Volunteers.
           </li>
         </ul>
@@ -397,6 +399,17 @@ Linking a registry record to a login is optional and done by administrators.`}
                 </td>
                 <td className="border border-slate-200 px-3 py-2">
                   Church name and contact details used on print/exports.
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-slate-200 px-3 py-2">
+                  <strong>Audit log</strong>
+                </td>
+                <td className="border border-slate-200 px-3 py-2">
+                  <strong>Admins only</strong>
+                </td>
+                <td className="border border-slate-200 px-3 py-2">
+                  History of important admin actions (who, what, when); filter and expand for technical detail.
                 </td>
               </tr>
               <tr>
@@ -668,6 +681,35 @@ Linking a registry record to a login is optional and done by administrators.`}
           <p>
             The dashboard describes <strong>operational</strong> data. It is <strong>not</strong> a parish registry
             report.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-slate-900">Audit log</h3>
+          <ol className="list-decimal space-y-2 pl-6">
+            <li>
+              Click <strong>Audit log</strong> in the top bar (with other admin tools, for example after{" "}
+              <strong>Church settings</strong>).
+            </li>
+            <li>
+              The table shows <strong>when</strong> something happened, <strong>who</strong> did it (name and email when
+              stored—otherwise email or another identifier), a short plain-language <strong>what</strong> label,{" "}
+              <strong>context</strong> where helpful, and <strong>details</strong> (a readable summary of the action).
+            </li>
+            <li>
+              Use <strong>Apply</strong> to filter by <strong>action code</strong> (the same short codes the app
+              stores—shown in the filter hint) and optional <strong>date/time</strong> range. Use pagination when the list
+              is long.
+            </li>
+            <li>
+              Expand a row (<strong>▼</strong>) to open <strong>technical details</strong> (for example internal IDs and
+              metadata) if you need them; day-to-day review usually stays in the main table.
+            </li>
+          </ol>
+          <p>
+            The audit log supports accountability and traceability across many admin workflows. It is not a full
+            analytics or compliance platform. Very old rows may not include a stored display name for{" "}
+            <strong>who</strong>.
           </p>
         </div>
 
@@ -1076,6 +1118,11 @@ Linking a registry record to a login is optional and done by administrators.`}
               <tr>
                 <td className="border border-slate-200 px-3 py-2">Church settings</td>
                 <td className="border border-slate-200 px-3 py-2 font-mono text-xs sm:text-sm">/settings/church</td>
+                <td className="border border-slate-200 px-3 py-2">Admin</td>
+              </tr>
+              <tr>
+                <td className="border border-slate-200 px-3 py-2">Audit log</td>
+                <td className="border border-slate-200 px-3 py-2 font-mono text-xs sm:text-sm">/audit-logs</td>
                 <td className="border border-slate-200 px-3 py-2">Admin</td>
               </tr>
               <tr>

@@ -215,9 +215,15 @@ export default function SecurityPage() {
             <h3 className="text-lg font-semibold text-slate-900">Administrative audit log</h3>
             <p>
               Shepherd also records selected administrative and security-related events in a database-backed{" "}
-              <strong>audit log</strong> (for example sign-in outcomes, registry and settings changes, exports, and
-              notifications). This supports accountability and basic traceability for administrators. It is not a full
-              security analytics platform and does not store complete exports or sensitive secrets.
+              <strong>audit log</strong> (for example sign-in outcomes, registry and settings changes, exports,
+              notifications, events, attendance, volunteer assignments, and similar actions). This supports
+              accountability, basic traceability, and can help administrators notice unusual or unexpected activity when
+              reviewing entries over time.
+            </p>
+            <p>
+              <strong>Passwords</strong>, <strong>session tokens</strong>, and other authentication secrets are{" "}
+              <strong>not</strong> stored in the audit log. The log does <strong>not</strong> keep full copies of exported
+              datasets. The audit log is <strong>not</strong> a full security information (SIEM) system.
             </p>
           </section>
 
